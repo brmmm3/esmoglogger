@@ -1,29 +1,25 @@
 package com.wakeup.esmoglogger.ui.chartview
 
+import android.annotation.SuppressLint
 import android.graphics.Color
 import android.view.View
 import com.github.mikephil.charting.charts.LineChart
-import com.github.mikephil.charting.components.AxisBase
 import com.github.mikephil.charting.components.XAxis
+import com.github.mikephil.charting.components.YAxis
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.formatter.ValueFormatter
+import com.wakeup.esmoglogger.data.DataSeries
 
 class LineChartManager(lineChart: LineChart) {
     private val chart: LineChart = lineChart
-    private val entries = ArrayList<Entry>()
-    private val dataSet = LineDataSet(entries, "Live Daten")
+    private var lvlDataSet = LineDataSet(ArrayList<Entry>(), "Level")
+    private var frqDataSet = LineDataSet(ArrayList<Entry>(), "Frequency")
 
     init {
-        dataSet.color = Color.BLUE
-        dataSet.setDrawCircles(false)
-        //dataSet.setCircleColor(Color.BLUE)
-        dataSet.lineWidth = 2f
-        dataSet.setDrawValues(true)
+        chart.data = LineData()
 
-        chart.data = LineData(dataSet)
-        chart.fitScreen() // Reset zoom
         chart.isEnabled = true
         chart.visibility = View.VISIBLE
 
@@ -33,7 +29,7 @@ class LineChartManager(lineChart: LineChart) {
         chart.setTouchEnabled(true)
         chart.setDragEnabled(true) // Enable dragging
         chart.setScaleEnabled(true) // Enable scaling
-        chart.setPinchZoom(true) // Enable pinch zoom
+        chart.setPinchZoom(false) // Enable pinch zoom
         //chart.setDrawGridBackground(false) // Disable grid background
         //chart.setHardwareAccelerationEnabled(false)
         //chart.animateX(1000)
@@ -77,30 +73,92 @@ class LineChartManager(lineChart: LineChart) {
             textSize = 12f  // Text size for Y-axis labels
             // Optional: Custom formatter for Y-axis (e.g., add units)
             valueFormatter = object : ValueFormatter() {
+                @SuppressLint("DefaultLocale")
                 override fun getFormattedValue(value: Float): String {
                     return String.format("%.1f mW", value)
                 }
             }
         }
 
-        chart.axisRight.isEnabled = false // Disable right Y-axis
+        // Y-axis configuration (left)
+        chart.axisRight.apply {
+            enableGridDashedLine(10f, 10f, 0f)
+            setDrawZeroLine(false)
+            setDrawGridLines(false)
+            setAxisMinimum(0f) // Minimum Y value
+            setAxisMaximum(1f) // Maximum Y value
+            setGranularity(0.1f) // Interval for Y-axis labels
+            setDrawLimitLinesBehindData(true)
+            textColor = Color.BLUE
+            //setLabelCount(6, true)
+
+            isEnabled = true
+            textSize = 12f  // Text size for Y-axis labels
+            // Optional: Custom formatter for Y-axis (e.g., add units)
+            valueFormatter = object : ValueFormatter() {
+                @SuppressLint("DefaultLocale")
+                override fun getFormattedValue(value: Float): String {
+                    return String.format("%.1f MHz", value)
+                }
+            }
+        }
+
+        lvlDataSet.apply {
+            color = Color.GREEN
+            setDrawCircles(false)
+            lineWidth = 2f
+            setDrawValues(true)
+            axisDependency = YAxis.AxisDependency.LEFT
+        }
+        chart.data.addDataSet(lvlDataSet)
+
+        frqDataSet.apply {
+            color = Color.BLUE
+            setDrawCircles(false)
+            lineWidth = 2f
+            setDrawValues(true)
+            axisDependency = YAxis.AxisDependency.RIGHT
+        }
+        chart.data.addDataSet(frqDataSet)
 
         chart.resetViewPortOffsets()
         chart.fitScreen() // Reset zoom
         chart.setVisibleXRangeMaximum(100f)
     }
 
-    class FrequencyYAxisValueFormatter : ValueFormatter() {
-        override fun getAxisLabel(value: Float, axis: AxisBase?): String {
-            return value.toString() + "mW"
-        }
+    fun showLevelData(show: Boolean) {
+        chart.axisLeft.isEnabled = show
+        lvlDataSet.setDrawValues(show)
     }
 
-    fun addEntry(time: Float, value: Float) {
-        entries.add(Entry(time, value))
-        if (value > chart.axisLeft.mAxisMaximum) {
-            chart.axisLeft.mAxisMaximum = value + 0.1f
+    fun showFrequencyData(show: Boolean) {
+        chart.axisRight.isEnabled = show
+        frqDataSet.setDrawValues(show)
+    }
+
+    fun clear() {
+        lvlDataSet.clear()
+        frqDataSet.clear()
+    }
+
+    fun set(data: DataSeries) {
+        lvlDataSet.clear()
+        frqDataSet.clear()
+        // TODO
+    }
+
+    fun add(time: Float, value: Pair<Float, Int>) {
+        val level = value.first
+        val frequency = value.second.toFloat()
+        lvlDataSet.addEntry(Entry(time, level))
+        if (level > chart.axisLeft.mAxisMaximum) {
+            chart.axisLeft.mAxisMaximum = level
         }
+        frqDataSet.addEntry(Entry(time, frequency))
+        if (frequency > chart.axisRight.mAxisMaximum) {
+            chart.axisRight.mAxisMaximum = frequency
+        }
+
         chart.data.notifyDataChanged()
         chart.notifyDataSetChanged()
         if (time > 100f) {

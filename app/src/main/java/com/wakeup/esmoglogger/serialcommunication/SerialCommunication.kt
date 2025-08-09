@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
+import com.wakeup.esmoglogger.data.SharedESmogData
 import com.wakeup.esmoglogger.ui.log.SharedLogData
 import java.io.InputStream
 import java.net.Socket
@@ -130,7 +131,7 @@ class SerialCommunication(private val context: Context?) {
                         try {
                             val (val1, val2) = receivedData.split(",")
                             val levelFrq = Pair(val1.toFloat(), val2.trim().toInt())
-                            SharedSerialData.sendData(levelFrq)
+                            SharedESmogData.add(levelFrq)
                         } catch (e: Exception) {
                             SharedLogData.addLog("Read error: ${e.message}")
                             break

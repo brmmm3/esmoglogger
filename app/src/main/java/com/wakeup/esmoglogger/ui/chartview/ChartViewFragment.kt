@@ -32,7 +32,7 @@ class ChartViewFragment : Fragment() {
 
         SharedChartData.data.observe(viewLifecycleOwner) { value ->
             // value = Pair(Time, Y-Value)
-            chartManager?.addEntry(value.first, value.second)
+            chartManager?.add(value.first, value.second)
         }
     }
 
