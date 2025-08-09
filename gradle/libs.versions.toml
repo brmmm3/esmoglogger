@@ -1,0 +1,42 @@
+[versions]
+agp = "8.12.0"
+junit = "4.13.2"
+junitVersion = "1.1.5"
+espressoCore = "3.5.1"
+appcompat = "1.6.1"
+material = "1.10.0"
+constraintlayout = "2.1.4"
+lifecycleLivedataKtx = "2.6.1"
+lifecycleViewmodelKtx = "2.6.1"
+mpandroidchart = "v3.1.0"
+navigationFragment = "2.6.0"
+navigationUi = "2.6.0"
+usbSerialForAndroid = "3.5.2"
+kotlin = "2.2.0"
+coreKtx = "1.16.0"
+usbSerialForAndroidVersion = "3.6.0"
+recyclerview = "1.4.0"
+activityKtx = "1.10.1"
+
+[libraries]
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+ext-junit = { group = "androidx.test.ext", name = "junit", version = "1.2.1" }
+espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version = "3.6.1" }
+appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.7.1" }
+material = { group = "com.google.android.material", name = "material", version = "1.12.0" }
+constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version = "2.2.1" }
+lifecycle-livedata-ktx = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version = "2.9.2" }
+lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version = "2.9.2" }
+mpandroidchart = { module = "com.github.PhilJay:MPAndroidChart", version.ref = "mpandroidchart" }
+navigation-fragment = { group = "androidx.navigation", name = "navigation-fragment", version = "2.9.2" }
+navigation-ui = { group = "androidx.navigation", name = "navigation-ui", version = "2.9.2" }
+usb-serial-for1-android = { module = "com.github.mik3y:usb-serial-for-android", version.ref = "usbSerialForAndroid" }
+core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.16.0" }
+usb-serial-for1-android-v360 = { module = "com.github.mik3y:usb-serial-for-android", version.ref = "usbSerialForAndroidVersion" }
+recyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "recyclerview" }
+activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+
