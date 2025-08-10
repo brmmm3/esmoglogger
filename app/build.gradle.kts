@@ -52,6 +52,8 @@ dependencies {
     implementation(libs.core.ktx)
     implementation(libs.recyclerview)
     implementation(libs.activity.ktx)
+    implementation(libs.gson)
+    implementation(libs.play.services.location)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

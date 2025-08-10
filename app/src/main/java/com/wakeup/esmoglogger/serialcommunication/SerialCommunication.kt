@@ -68,7 +68,9 @@ class SerialCommunication(private val context: Context?) {
         usbManager.requestPermission(device, permissionIntent)
     }
 
-    fun setupConnection(isEmulator: Boolean = false) {
+    fun setupConnection() {
+        // Detect emulator (simple check, adjust as needed)
+        val isEmulator = android.os.Build.FINGERPRINT.contains("generic") || android.os.Build.MODEL.contains("Emulator")
         if (isEmulator) {
             setupTcpConnection()
         } else {
@@ -131,7 +133,7 @@ class SerialCommunication(private val context: Context?) {
                         try {
                             val (val1, val2) = receivedData.split(",")
                             val levelFrq = Pair(val1.toFloat(), val2.trim().toInt())
-                            SharedESmogData.add(levelFrq)
+                            SharedESmogData.addLvlFrq(levelFrq)
                         } catch (e: Exception) {
                             SharedLogData.addLog("Read error: ${e.message}")
                             break
@@ -181,8 +183,5 @@ class SerialCommunication(private val context: Context?) {
 
     init {
         registerUsbReceiver()
-        // Detect emulator (simple check, adjust as needed)
-        val isEmulator = android.os.Build.FINGERPRINT.contains("generic") || android.os.Build.MODEL.contains("Emulator")
-        setupConnection(isEmulator)
     }
 }

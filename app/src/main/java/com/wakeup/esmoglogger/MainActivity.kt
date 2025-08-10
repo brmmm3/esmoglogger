@@ -9,6 +9,7 @@ import androidx.navigation.ui.NavigationUI.setupWithNavController
 import com.wakeup.esmoglogger.databinding.ActivityMainBinding
 import com.wakeup.esmoglogger.serialcommunication.SerialCommunication
 import com.wakeup.esmoglogger.data.SharedESmogData
+import com.wakeup.esmoglogger.serialcommunication.SharedSerialData
 import com.wakeup.esmoglogger.ui.chartview.SharedChartData
 import com.wakeup.esmoglogger.ui.log.SharedLogData
 
@@ -25,7 +26,7 @@ import com.wakeup.esmoglogger.ui.log.SharedLogData
 class MainActivity : AppCompatActivity() {
     private var binding: ActivityMainBinding? = null
     private var serial: SerialCommunication? = null
-    private var time = 0.0f;
+    private var time = 0.0f
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,7 +37,7 @@ class MainActivity : AppCompatActivity() {
         // Passing each menu ID as a set of Ids because each
         // menu should be considered as top level destinations.
         val appBarConfiguration = AppBarConfiguration.Builder(
-            R.id.navigation_home, R.id.navigation_dashboard, R.id.navigation_notifications
+            R.id.navigation_home, R.id.navigation_chart, R.id.navigation_log
         ).build()
         //val navController = findNavController(this, R.id.nav_host_fragment_activity_main)
         val navHostFragment = supportFragmentManager
@@ -49,9 +50,17 @@ class MainActivity : AppCompatActivity() {
         serial = SerialCommunication(this)
         SharedESmogData.data.observe(this) { value ->
             // value = Pair(SignalLevel, Frequency)
-            SharedChartData.addData(Pair(time, value))
-            SharedLogData.addLog("Received: $value")
+            SharedChartData.add(Pair(time, value))
+            //SharedLogData.addLog("Received: $value")
             time += 0.5f
+        }
+        SharedSerialData.command.observe(this) { command ->
+            if (command == "start") {
+                time = 0f
+                serial?.setupConnection()
+            } else if (command == "stop") {
+                serial?.closeConnection()
+            }
         }
     }
 

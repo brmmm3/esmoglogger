@@ -1,6 +1,19 @@
 <resources>
     <string name="app_name">ESmogLogger</string>
     <string name="title_home">Home</string>
-    <string name="title_dashboard">Dashboard</string>
-    <string name="title_notifications">Notifications</string>
+    <string name="title_chart">Chart</string>
+    <string name="title_log">Log</string>
+    <string name="main_menu_title">Main menu</string>
+    <string name="main_menu_reset_zoom">Reset chart zoom</string>
+    <string name="main_menu_set_notes">Set notes</string>
+    <string name="radio_chart_lvl">Lvl</string>
+    <string name="radio_chart_frq">Frq</string>
+    <string name="radio_chart_lvl_plus_frq">Frq + Lvl</string>
+    <string name="radio_chart_lvl_and_frq">Frq | Lvl</string>
+    <string name="record_gps_position">Record GPS position</string>
+    <string name="gps_position_title">GPS Position:</string>
+    <string name="gps_position">Lat=?  Lng=?</string>
+    <string name="recordings_title">Recordings</string>
+    <string name="recorded_time_title">Recorded time:</string>
+    <string name="recorded_time_0s">0 s</string>
 </resources>

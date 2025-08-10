@@ -29,15 +29,42 @@ class ChartViewFragment : Fragment() {
 
         // Create the chart manager
         chartManager = LineChartManager(lineChart)
+        chartManager?.showFrequencyData(false)
 
         SharedChartData.data.observe(viewLifecycleOwner) { value ->
             // value = Pair(Time, Y-Value)
             chartManager?.add(value.first, value.second)
+        }
+
+        SharedChartData.command.observe(viewLifecycleOwner) { command ->
+            if (command == "resetScale") {
+                chartManager?.resetScale()
+            }
+        }
+
+        SharedChartData.view.observe(viewLifecycleOwner) { view ->
+            if (view == "Lvl") {
+                chartManager?.showLevelData(true)
+                chartManager?.showFrequencyData(false)
+            } else if (view == "Frq") {
+                chartManager?.showLevelData(false)
+                chartManager?.showFrequencyData(true)
+            } else if (view == "LvlPlusFrq") {
+                chartManager?.showLevelData(true)
+                chartManager?.showFrequencyData(true)
+            } else if (view == "LvlAndFrq") {
+                chartManager?.showLevelData(true)
+                chartManager?.showFrequencyData(true)
+            }
         }
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
         chartManager = null
+    }
+
+    fun resetScale() {
+        chartManager?.resetScale()
     }
 }

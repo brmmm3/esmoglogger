@@ -63,8 +63,8 @@ class LineChartManager(lineChart: LineChart) {
             setDrawZeroLine(false)
             setDrawGridLines(true)
             setAxisMinimum(0f) // Minimum Y value
-            setAxisMaximum(1f) // Maximum Y value
-            setGranularity(0.1f) // Interval for Y-axis labels
+            setAxisMaximum(0.1f) // Maximum Y value
+            setGranularity(0.01f) // Interval for Y-axis labels
             setDrawLimitLinesBehindData(true)
             textColor = Color.GREEN
             //setLabelCount(6, true)
@@ -86,10 +86,10 @@ class LineChartManager(lineChart: LineChart) {
             setDrawZeroLine(false)
             setDrawGridLines(false)
             setAxisMinimum(0f) // Minimum Y value
-            setAxisMaximum(1f) // Maximum Y value
-            setGranularity(0.1f) // Interval for Y-axis labels
+            setAxisMaximum(0.1f) // Maximum Y value
+            setGranularity(0.01f) // Interval for Y-axis labels
             setDrawLimitLinesBehindData(true)
-            textColor = Color.BLUE
+            textColor = Color.YELLOW
             //setLabelCount(6, true)
 
             isEnabled = true
@@ -105,18 +105,18 @@ class LineChartManager(lineChart: LineChart) {
 
         lvlDataSet.apply {
             color = Color.GREEN
-            setDrawCircles(false)
             lineWidth = 2f
-            setDrawValues(true)
+            setDrawCircles(false)
+            setDrawValues(false)
             axisDependency = YAxis.AxisDependency.LEFT
         }
         chart.data.addDataSet(lvlDataSet)
 
         frqDataSet.apply {
-            color = Color.BLUE
-            setDrawCircles(false)
+            color = Color.argb(128, 255, 255, 0)
             lineWidth = 2f
-            setDrawValues(true)
+            setDrawCircles(false)
+            setDrawValues(false)
             axisDependency = YAxis.AxisDependency.RIGHT
         }
         chart.data.addDataSet(frqDataSet)
@@ -128,12 +128,14 @@ class LineChartManager(lineChart: LineChart) {
 
     fun showLevelData(show: Boolean) {
         chart.axisLeft.isEnabled = show
-        lvlDataSet.setDrawValues(show)
     }
 
     fun showFrequencyData(show: Boolean) {
         chart.axisRight.isEnabled = show
-        frqDataSet.setDrawValues(show)
+    }
+
+    fun resetScale() {
+        chart.fitScreen()
     }
 
     fun clear() {

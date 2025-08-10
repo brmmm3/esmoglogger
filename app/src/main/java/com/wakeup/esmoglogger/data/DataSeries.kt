@@ -7,28 +7,35 @@ import java.util.concurrent.CopyOnWriteArrayList
 class DataSeries {
     var startTime = ""
     // Data series name
-    var seriesName = ""
-    var dataSeries: CopyOnWriteArrayList<Pair<Float, Int>> = CopyOnWriteArrayList()
+    var name = ""
+    var lvlFrqData: CopyOnWriteArrayList<Pair<Float, Int>> = CopyOnWriteArrayList()
+    var gpsLocations: CopyOnWriteArrayList<Pair<Double, Double>> = CopyOnWriteArrayList()
     // Data series notes
     var seriesNotes = ""
+    // Filename. If empty dataseries is not saved
+    var filename = ""
 
     fun clear() {
-        dataSeries = CopyOnWriteArrayList()
+        lvlFrqData = CopyOnWriteArrayList()
     }
 
     fun start() {
-        dataSeries = CopyOnWriteArrayList()
+        lvlFrqData = CopyOnWriteArrayList()
         val currentDateTime = LocalDateTime.now()
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         startTime = currentDateTime.format(formatter)
     }
 
-    fun add(data: Pair<Float, Int>) {
-        dataSeries.add(data)
+    fun addLvlFrq(data: Pair<Float, Int>) {
+        lvlFrqData.add(data)
+    }
+
+    fun addGpsLocation(data: Pair<Double, Double>) {
+        gpsLocations.add(data)
     }
 
     fun stop(name: String) {
-        this.seriesName = name
+        this.name = name
     }
 
     fun setNotes(notes: String) {
