@@ -11,6 +11,29 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <LinearLayout
+        style="?android:attr/buttonBarStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <Button
+            android:id="@+id/button_reset_scale"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginEnd="8dp"
+            android:text="@string/main_menu_reset_zoom"
+            android:textSize="16sp" />
+
+        <Spinner
+            android:id="@+id/chart_view_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/chart_view_options" />
+
+    </LinearLayout>
+
     <com.github.mikephil.charting.charts.LineChart
         android:id="@+id/lineChart"
         android:layout_width="match_parent"

@@ -4,7 +4,7 @@
     <string name="title_chart">Chart</string>
     <string name="title_log">Log</string>
     <string name="main_menu_title">Main menu</string>
-    <string name="main_menu_reset_zoom">Reset chart zoom</string>
+    <string name="main_menu_reset_zoom">Reset zoom</string>
     <string name="main_menu_set_notes">Set notes</string>
     <string name="radio_chart_lvl">Lvl</string>
     <string name="radio_chart_frq">Frq</string>
@@ -16,4 +16,11 @@
     <string name="recordings_title">Recordings</string>
     <string name="recorded_time_title">Recorded time:</string>
     <string name="recorded_time_0s">0 s</string>
+    <string name="title_map">Map</string>
+    <string-array name="chart_view_options">
+        <item>Lvl</item>
+        <item>Frq</item>
+        <item>Lvl + Frq</item>
+        <item>Lvl | Frq</item>
+    </string-array>
 </resources>

@@ -2,11 +2,13 @@ package com.wakeup.esmoglogger.data
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import java.time.Duration
+import java.time.LocalDateTime
 import kotlin.collections.MutableList
 
 object  SharedESmogData {
-    private val _data = MutableLiveData<Pair<Float, Int>>()
-    val data: LiveData<Pair<Float, Int>> get() = _data
+    private val _data = MutableLiveData<Pair<Float, Pair<Float, Int>>>()
+    val data: LiveData<Pair<Float, Pair<Float, Int>>> get() = _data
 
     val dataSeriesHistory: MutableList<DataSeries> = mutableListOf()
     var dataSeries = DataSeries()
@@ -31,8 +33,9 @@ object  SharedESmogData {
     }
 
     fun addLvlFrq(data: Pair<Float, Int>) {
-        dataSeries.addLvlFrq(data)
-        _data.postValue(data)
+        val dt = Duration.between(dataSeries.startTime, LocalDateTime.now()).toMillis().toFloat() / 1000f
+        dataSeries.addLvlFrq(dt, data)
+        _data.postValue(Pair(dt, data))
     }
 
     fun stop(name: String) {

@@ -18,6 +18,7 @@ class LineChartManager(lineChart: LineChart) {
     private var frqDataSet = LineDataSet(ArrayList<Entry>(), "Frequency")
 
     init {
+        chart.renderer = CustomLineChartRenderer(chart, chart.animator, chart.viewPortHandler)
         chart.data = LineData()
 
         chart.isEnabled = true
@@ -63,7 +64,7 @@ class LineChartManager(lineChart: LineChart) {
             setDrawZeroLine(false)
             setDrawGridLines(true)
             setAxisMinimum(0f) // Minimum Y value
-            setAxisMaximum(0.1f) // Maximum Y value
+            setAxisMaximum(1f) // Maximum Y value
             setGranularity(0.01f) // Interval for Y-axis labels
             setDrawLimitLinesBehindData(true)
             textColor = Color.GREEN
@@ -113,7 +114,7 @@ class LineChartManager(lineChart: LineChart) {
         chart.data.addDataSet(lvlDataSet)
 
         frqDataSet.apply {
-            color = Color.argb(128, 255, 255, 0)
+            color = Color.argb(100, 255, 255, 0)
             lineWidth = 2f
             setDrawCircles(false)
             setDrawValues(false)
@@ -128,14 +129,36 @@ class LineChartManager(lineChart: LineChart) {
 
     fun showLevelData(show: Boolean) {
         chart.axisLeft.isEnabled = show
+        chart.resetViewPortOffsets()
+        chart.fitScreen() // Reset zoom
     }
 
     fun showFrequencyData(show: Boolean) {
         chart.axisRight.isEnabled = show
+        chart.resetViewPortOffsets()
+        chart.fitScreen() // Reset zoom
+    }
+
+    private fun scaleAxisToLast100(values: ArrayList<Entry>): Float {
+        var max = 0.1f
+        values.takeLast(100).forEach { it ->
+            if (it.y > max) {
+                max = it.y
+            }
+        }
+        return max
     }
 
     fun resetScale() {
-        chart.fitScreen()
+        chart.resetViewPortOffsets()
+        chart.fitScreen() // Reset zoom
+        chart.setVisibleXRangeMaximum(100f)
+        chart.axisLeft.mAxisMaximum = scaleAxisToLast100(lvlDataSet.values as ArrayList<Entry>)
+        chart.axisRight.mAxisMaximum = scaleAxisToLast100(frqDataSet.values as ArrayList<Entry>)
+    }
+
+    fun isEmpty(): Boolean {
+        return lvlDataSet.values.isEmpty() && frqDataSet.values.isEmpty()
     }
 
     fun clear() {
@@ -150,17 +173,20 @@ class LineChartManager(lineChart: LineChart) {
     }
 
     fun add(time: Float, value: Pair<Float, Int>) {
-        val level = value.first
-        val frequency = value.second.toFloat()
-        lvlDataSet.addEntry(Entry(time, level))
-        if (level > chart.axisLeft.mAxisMaximum) {
-            chart.axisLeft.mAxisMaximum = level
+        if (chart.axisLeft.isEnabled) {
+            val level = value.first
+            lvlDataSet.addEntry(Entry(time, level))
+            if (level > chart.axisLeft.mAxisMaximum) {
+                chart.axisLeft.mAxisMaximum = level
+            }
         }
-        frqDataSet.addEntry(Entry(time, frequency))
-        if (frequency > chart.axisRight.mAxisMaximum) {
-            chart.axisRight.mAxisMaximum = frequency
+        if (chart.axisRight.isEnabled) {
+            val frequency = value.second.toFloat()
+            frqDataSet.addEntry(Entry(time, frequency))
+            if (frequency > chart.axisRight.mAxisMaximum) {
+                chart.axisRight.mAxisMaximum = frequency
+            }
         }
-
         chart.data.notifyDataChanged()
         chart.notifyDataSetChanged()
         if (time > 100f) {

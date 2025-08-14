@@ -12,6 +12,7 @@ lifecycleViewmodelKtx = "2.6.1"
 mpandroidchart = "v3.1.0"
 navigationFragment = "2.6.0"
 navigationUi = "2.6.0"
+osmdroidAndroid = "6.1.20"
 playServicesLocation = "21.3.0"
 usbSerialForAndroid = "3.5.2"
 kotlin = "2.2.0"
@@ -33,6 +34,7 @@ lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-view
 mpandroidchart = { module = "com.github.PhilJay:MPAndroidChart", version.ref = "mpandroidchart" }
 navigation-fragment = { group = "androidx.navigation", name = "navigation-fragment", version = "2.9.3" }
 navigation-ui = { group = "androidx.navigation", name = "navigation-ui", version = "2.9.3" }
+osmdroid-android = { module = "org.osmdroid:osmdroid-android", version.ref = "osmdroidAndroid" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 usb-serial-for1-android = { module = "com.github.mik3y:usb-serial-for-android", version.ref = "usbSerialForAndroid" }
 core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.16.0" }

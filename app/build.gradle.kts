@@ -54,6 +54,7 @@ dependencies {
     implementation(libs.activity.ktx)
     implementation(libs.gson)
     implementation(libs.play.services.location)
+    implementation(libs.osmdroid.android)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

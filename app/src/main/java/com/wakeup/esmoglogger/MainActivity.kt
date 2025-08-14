@@ -9,9 +9,13 @@ import androidx.navigation.ui.NavigationUI.setupWithNavController
 import com.wakeup.esmoglogger.databinding.ActivityMainBinding
 import com.wakeup.esmoglogger.serialcommunication.SerialCommunication
 import com.wakeup.esmoglogger.data.SharedESmogData
+import com.wakeup.esmoglogger.location.LocationHandler
+import com.wakeup.esmoglogger.location.SharedLocationData
 import com.wakeup.esmoglogger.serialcommunication.SharedSerialData
 import com.wakeup.esmoglogger.ui.chartview.SharedChartData
 import com.wakeup.esmoglogger.ui.log.SharedLogData
+import com.wakeup.esmoglogger.ui.mapview.SharedMapData
+import org.osmdroid.config.Configuration
 
 /* https://hcfricke.com/2018/09/19/emf-11-cornet-ed88t-plus-ein-tri-meter-unter-200e-taugt-es-was/
 
@@ -26,10 +30,14 @@ import com.wakeup.esmoglogger.ui.log.SharedLogData
 class MainActivity : AppCompatActivity() {
     private var binding: ActivityMainBinding? = null
     private var serial: SerialCommunication? = null
-    private var time = 0.0f
+    private lateinit var locationHandler: LocationHandler
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Set custom user-agent for osmdroid to comply with OSM policy
+        Configuration.getInstance().userAgentValue = applicationContext.packageName + "/1.0"
+        Configuration.getInstance().load(applicationContext, getPreferences(MODE_PRIVATE))
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding!!.getRoot())
@@ -37,7 +45,7 @@ class MainActivity : AppCompatActivity() {
         // Passing each menu ID as a set of Ids because each
         // menu should be considered as top level destinations.
         val appBarConfiguration = AppBarConfiguration.Builder(
-            R.id.navigation_home, R.id.navigation_chart, R.id.navigation_log
+            R.id.navigation_home, R.id.navigation_chart, R.id.navigation_map, R.id.navigation_log
         ).build()
         //val navController = findNavController(this, R.id.nav_host_fragment_activity_main)
         val navHostFragment = supportFragmentManager
@@ -45,21 +53,32 @@ class MainActivity : AppCompatActivity() {
         val navController = navHostFragment.navController
         setupActionBarWithNavController(this, navController, appBarConfiguration)
         setupWithNavController(binding!!.navView, navController)
+
         // Setup USB serial communication
         SharedLogData.addLog("Setup Serial")
         serial = SerialCommunication(this)
-        SharedESmogData.data.observe(this) { value ->
-            // value = Pair(SignalLevel, Frequency)
-            SharedChartData.add(Pair(time, value))
-            //SharedLogData.addLog("Received: $value")
-            time += 0.5f
-        }
         SharedSerialData.command.observe(this) { command ->
             if (command == "start") {
-                time = 0f
                 serial?.setupConnection()
             } else if (command == "stop") {
                 serial?.closeConnection()
+            }
+        }
+
+        SharedESmogData.data.observe(this) { value ->
+            // value = Pair(SignalLevel, Frequency)
+            SharedChartData.add(value)
+        }
+
+        locationHandler = LocationHandler(this) { location ->
+            SharedLocationData.sendLocation(location)
+        }
+        SharedMapData.command.observe(this) { command ->
+            if (command == "start") {
+                locationHandler.initialize()
+                locationHandler.resume()
+            } else if (command == "stop") {
+                locationHandler.pause()
             }
         }
     }

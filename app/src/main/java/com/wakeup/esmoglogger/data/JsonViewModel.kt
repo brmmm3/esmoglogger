@@ -7,7 +7,6 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
-import com.google.gson.Gson
 import java.io.File
 import java.io.FileWriter
 
@@ -15,7 +14,7 @@ class JsonViewModel : ViewModel() {
     fun saveJsonToStorage(contentResolver: ContentResolver, context: android.content.Context,
                           fileName: String, dataSeries: DataSeries) {
         try {
-            val jsonString = Gson().toJson(dataSeries)
+            val jsonString = dataSeries.toJson().toString()
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val contentValues = ContentValues().apply {

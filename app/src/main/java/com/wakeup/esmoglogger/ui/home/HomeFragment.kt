@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -12,13 +13,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
-import android.widget.Button
 import android.widget.EditText
 import android.widget.ListView
-import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -35,8 +35,9 @@ import com.wakeup.esmoglogger.data.DataSeries
 import com.wakeup.esmoglogger.data.JsonViewModel
 import com.wakeup.esmoglogger.data.SharedESmogData
 import com.wakeup.esmoglogger.databinding.FragmentHomeBinding
+import com.wakeup.esmoglogger.location.SharedLocationData
 import com.wakeup.esmoglogger.serialcommunication.SharedSerialData
-import com.wakeup.esmoglogger.ui.chartview.SharedChartData
+import com.wakeup.esmoglogger.ui.mapview.SharedMapData
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -47,11 +48,9 @@ class HomeFragment : Fragment() {
     private var recordButton: MaterialButton? = null
     private var deleteButton: MaterialButton? = null
     private var saveButton: MaterialButton? = null
-    private var selectedChartView: String = "Lvl"
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
-    private var isGpsTracking = false
 
     private var startTime: LocalDateTime = LocalDateTime.now()
     private var isRecording = false
@@ -113,39 +112,19 @@ class HomeFragment : Fragment() {
         binding = FragmentHomeBinding.inflate(inflater, container, false)
         val root: View = binding!!.getRoot()
 
-        val resetScaleButton = root.findViewById<Button>(R.id.button_reset_scale)
-
-        resetScaleButton?.setOnClickListener(View.OnClickListener { v: View? ->
-            SharedChartData.sendCommand("resetScale")
-        })
-
-        val radioChartGroup: RadioGroup = root.findViewById(R.id.radio_group_chart_view)
-
-        radioChartGroup.check(R.id.radio_chart_lvl) // Activate default button
-        radioChartGroup.setOnCheckedChangeListener { _, checkedId ->
-            selectedChartView = when (checkedId) {
-                R.id.radio_chart_lvl -> "Lvl"
-                R.id.radio_chart_frq -> "Frq"
-                R.id.radio_chart_lvl_plus_frq -> "LvlPlusFrq"
-                else -> "LvlAndFrq"
-            }
-            SharedChartData.setView(selectedChartView)
-        }
-
         val recordGpsCheckBox: MaterialCheckBox = root.findViewById(R.id.save_gps_checkbox)
 
         recordGpsCheckBox.setOnCheckedChangeListener { _, isChecked ->
-            if (isGpsTracking) {
-                stopLocationUpdates()
-                isGpsTracking = false
-                root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=?  Lng=?"
-            }
             if (isChecked) {
-                checkLocationPermission()
+                SharedMapData.sendCommand("start")
             } else {
-                stopLocationUpdates()
+                root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=?  Lng=?"
+                SharedMapData.sendCommand("stop")
             }
             SharedESmogData.setGpsRecording(isChecked)
+        }
+        SharedLocationData.location.observe(viewLifecycleOwner) { location ->
+            root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=${location.latitude}  Lng=${location.longitude}"
         }
 
         recordButton = root.findViewById<MaterialButton>(R.id.button_record)
@@ -155,13 +134,19 @@ class HomeFragment : Fragment() {
         saveButton = root.findViewById<MaterialButton>(R.id.button_save)
         saveButton?.isEnabled = false
 
-        recordButton?.setOnClickListener(View.OnClickListener { v: View? ->
+        if (isRecording) {
+            recordButton?.setIconResource(R.drawable.stop_32p)
+        } else {
+            recordButton?.setIconResource(R.drawable.record_32p)
+        }
+        recordButton?.setOnClickListener { v: View? ->
             isRecording = !isRecording
             if (isRecording) {
                 SharedSerialData.sendCommand("start")
                 recordButton?.setIconResource(R.drawable.stop_32p)
                 recordGpsCheckBox.isEnabled = false
                 startTime = LocalDateTime.now()
+                SharedESmogData.start()
                 view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
                 handler.post(updateTimeRunnable)
             } else {
@@ -171,26 +156,32 @@ class HomeFragment : Fragment() {
                 recordGpsCheckBox.isEnabled = true
                 val currentDateTime = LocalDateTime.now()
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                showTextInputDialog("Name of recording", "Enter name of recording",
-                    "stop", currentDateTime.format(formatter), true)
+                showTextInputDialog(
+                    "Name of recording", "Enter name of recording",
+                    "stop", currentDateTime.format(formatter), true
+                )
             }
-        })
+        }
 
-        setNotesButton?.setOnClickListener(View.OnClickListener { v: View? ->
-            showTextInputDialog("Notes", "Enter notes",
-                "notes", "", false)
-        })
+        setNotesButton?.setOnClickListener { v: View? ->
+            showTextInputDialog(
+                "Notes", "Enter notes",
+                "notes", "", false
+            )
+        }
 
-        deleteButton?.setOnClickListener(View.OnClickListener { v: View? ->
+        deleteButton?.setOnClickListener { v: View? ->
             showConfirmationDialog()
-        })
+        }
 
-        saveButton?.setOnClickListener(View.OnClickListener { v: View? ->
+        saveButton?.setOnClickListener { v: View? ->
             val currentDateTime = LocalDateTime.now()
             val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd.HH_mm_ss")
-            showTextInputDialog("Filename", "Enter filename without extension",
-                "save", "ESMOG-${currentDateTime.format(formatter)}", true)
-        })
+            showTextInputDialog(
+                "Filename", "Enter filename without extension",
+                "save", "ESMOG-${currentDateTime.format(formatter)}", true
+            )
+        }
 
         val recordingsListView: ListView = root.findViewById(R.id.recordings_list_view)
 
@@ -302,56 +293,6 @@ class HomeFragment : Fragment() {
             true // Keine Berechtigung erforderlich für MediaStore ab Android 10
         } else {
             requireContext().checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-        }
-    }
-
-    private fun checkLocationPermission() {
-        when {
-            ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED -> {
-                startLocationUpdates()
-            }
-            shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) -> {
-                Toast.makeText(
-                    requireContext(),
-                    "Standortberechtigung erforderlich für GPS",
-                    Toast.LENGTH_LONG
-                ).show()
-                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-            }
-            else -> {
-                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-            }
-        }
-    }
-
-    private fun startLocationUpdates() {
-        val locationRequest = LocationRequest.create().apply {
-            interval = 10000 // Update alle 10 Sekunden
-            fastestInterval = 5000 // Schnellstes Update alle 5 Sekunden
-            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-        }
-
-        try {
-            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null)
-            isGpsTracking = true
-        } catch (e: SecurityException) {
-            Toast.makeText(requireContext(), "Berechtigungsfehler: ${e.message}", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun stopLocationUpdates() {
-        fusedLocationClient.removeLocationUpdates(locationCallback)
-    }
-
-    // Launcher für Berechtigungsanfrage
-    private val locationPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-        if (isGranted) {
-            startLocationUpdates()
-        } else {
-            Toast.makeText(requireContext(), "Standortberechtigung verweigert", Toast.LENGTH_LONG).show()
         }
     }
 

@@ -16,11 +16,7 @@ class LogFragment : Fragment() {
         inflater: LayoutInflater,
         container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
-        return inflater.inflate(R.layout.fragment_log, container, false)
-    }
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
+        val view = inflater.inflate(R.layout.fragment_log, container, false)
         recyclerView = view.findViewById<RecyclerView?>(R.id.logView)
         recyclerView?.layoutManager = LinearLayoutManager(this.context)
         val adapter = LogAdapter(emptyList())
@@ -29,6 +25,7 @@ class LogFragment : Fragment() {
             recyclerView?.adapter = LogAdapter(logs)
             recyclerView?.scrollToPosition(logs.size - 1) // Auto-scroll to latest log
         }
+        return view
     }
 
     override fun onDestroyView() {

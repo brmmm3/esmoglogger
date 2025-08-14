@@ -12,6 +12,11 @@
         android:title="@string/title_chart" />
 
     <item
+        android:id="@+id/navigation_map"
+        android:icon="@drawable/globe_24p"
+        android:title="@string/title_map" />
+
+    <item
         android:id="@+id/navigation_log"
         android:icon="@drawable/log_24p"
         android:title="@string/title_log" />
