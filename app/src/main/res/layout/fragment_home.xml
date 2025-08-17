@@ -6,14 +6,30 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp"
+    android:background="@drawable/transparent_home_background_image"
     tools:context=".ui.home.HomeFragment">
 
-    <com.google.android.material.checkbox.MaterialCheckBox
-        android:id="@+id/save_gps_checkbox"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
-        android:text="@string/record_gps_position" />
+        android:orientation="horizontal">
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/save_gps_enabled"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/gpsEnabledLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_gravity="center_vertical"
+            android:text="@string/record_gps_location"
+            android:textSize="18sp" />
+
+    </LinearLayout>
 
     <LinearLayout
         style="?android:attr/buttonBarStyle"
@@ -26,10 +42,10 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/gps_position_title"
+            android:text="@string/gps_location_title"
             android:textSize="18sp"
             android:paddingStart="8dp"
-            android:paddingEnd="8dp" />
+            android:paddingEnd="16dp" />
 
         <TextView
             android:id="@+id/textview_gps_location"
@@ -95,15 +111,19 @@
             android:layout_width="wrap_content"
             android:layout_height="54dp"
             android:layout_marginEnd="8dp"
+            app:icon="@drawable/button_delete"
             app:iconGravity="textStart"
-            android:drawableTop="@drawable/delete_32p" />
+            app:iconTint="@null"
+            android:enabled="false" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/button_save"
             android:layout_width="wrap_content"
             android:layout_height="54dp"
+            app:icon="@drawable/button_save"
             app:iconGravity="textStart"
-            android:drawableTop="@drawable/save_32p" />
+            app:iconTint="@null"
+            android:enabled="false" />
 
     </LinearLayout>
 

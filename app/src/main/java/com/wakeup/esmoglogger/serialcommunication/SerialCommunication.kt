@@ -10,7 +10,7 @@ import androidx.core.content.ContextCompat
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
-import com.wakeup.esmoglogger.data.SharedESmogData
+import com.wakeup.esmoglogger.data.SharedDataSeries
 import com.wakeup.esmoglogger.ui.log.SharedLogData
 import java.io.InputStream
 import java.net.Socket
@@ -126,14 +126,13 @@ class SerialCommunication(private val context: Context?) {
                         inputStream?.read(buffer) ?: -1
                     }
                     if (numBytesRead > 0) {
-                        val receivedData = String(buffer, 0, numBytesRead)
+                        val receivedData = String(buffer, 0, numBytesRead).trim()
                         // 1827E-03,2050
                         // Signal level: 1827E-03
                         // Frequency: 2050
                         try {
                             val (val1, val2) = receivedData.split(",")
-                            val levelFrq = Pair(val1.toFloat(), val2.trim().toInt())
-                            SharedESmogData.addLvlFrq(levelFrq)
+                            SharedDataSeries.addESmog(val1.toFloat(), val2.toInt())
                         } catch (e: Exception) {
                             SharedLogData.addLog("Read error: ${e.message}")
                             break

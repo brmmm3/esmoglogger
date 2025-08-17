@@ -1,20 +1,25 @@
 package com.wakeup.esmoglogger
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Environment
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.NavigationUI.setupActionBarWithNavController
 import androidx.navigation.ui.NavigationUI.setupWithNavController
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.wakeup.esmoglogger.databinding.ActivityMainBinding
 import com.wakeup.esmoglogger.serialcommunication.SerialCommunication
-import com.wakeup.esmoglogger.data.SharedESmogData
+import com.wakeup.esmoglogger.data.SharedDataSeries
 import com.wakeup.esmoglogger.location.LocationHandler
 import com.wakeup.esmoglogger.location.SharedLocationData
 import com.wakeup.esmoglogger.serialcommunication.SharedSerialData
 import com.wakeup.esmoglogger.ui.chartview.SharedChartData
 import com.wakeup.esmoglogger.ui.log.SharedLogData
-import com.wakeup.esmoglogger.ui.mapview.SharedMapData
 import org.osmdroid.config.Configuration
 
 /* https://hcfricke.com/2018/09/19/emf-11-cornet-ed88t-plus-ein-tri-meter-unter-200e-taugt-es-was/
@@ -27,10 +32,14 @@ import org.osmdroid.config.Configuration
     TETRA: um die 380-410MHz
 */
 
+data class FileInfo(val name: String, val size: Long)
+
 class MainActivity : AppCompatActivity() {
     private var binding: ActivityMainBinding? = null
     private var serial: SerialCommunication? = null
     private lateinit var locationHandler: LocationHandler
+
+    private val STORAGE_PERMISSION_REQUEST_CODE = 1001
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,12 +56,17 @@ class MainActivity : AppCompatActivity() {
         val appBarConfiguration = AppBarConfiguration.Builder(
             R.id.navigation_home, R.id.navigation_chart, R.id.navigation_map, R.id.navigation_log
         ).build()
-        //val navController = findNavController(this, R.id.nav_host_fragment_activity_main)
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment_activity_main) as NavHostFragment
         val navController = navHostFragment.navController
         setupActionBarWithNavController(this, navController, appBarConfiguration)
         setupWithNavController(binding!!.navView, navController)
+
+        binding!!.navView.menu.findItem(R.id.navigation_map)?.let { menuItem ->
+            menuItem.isEnabled = true
+            menuItem.icon?.clearColorFilter()
+            menuItem.icon?.alpha = 255
+        }
 
         // Setup USB serial communication
         SharedLogData.addLog("Setup Serial")
@@ -65,15 +79,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        SharedESmogData.data.observe(this) { value ->
-            // value = Pair(SignalLevel, Frequency)
-            SharedChartData.add(value)
+        SharedDataSeries.esmog.observe(this) { esmog ->
+            SharedChartData.add(esmog)
         }
 
         locationHandler = LocationHandler(this) { location ->
             SharedLocationData.sendLocation(location)
         }
-        SharedMapData.command.observe(this) { command ->
+        SharedLocationData.command.observe(this) { command ->
             if (command == "start") {
                 locationHandler.initialize()
                 locationHandler.resume()
@@ -81,10 +94,46 @@ class MainActivity : AppCompatActivity() {
                 locationHandler.pause()
             }
         }
+
+        if (checkStoragePermissions()) {
+            listDirectoryContents()
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         serial?.cleanup()
+    }
+
+    private fun checkStoragePermissions(): Boolean {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
+                STORAGE_PERMISSION_REQUEST_CODE
+            )
+            return false
+        }
+        return true
+    }
+
+    private fun listDirectoryContents() {
+        // Use public Downloads directory (or change to context.getExternalFilesDir(null) for app-specific storage)
+        val directory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+
+        SharedDataSeries.dataSeriesList.addAll(directory.listFiles()?.filter { it.exists() && it.name.startsWith("ESMOG-") && it.extension == "json" }?.map {
+            FileInfo(it.name, it.length())
+        } ?: emptyList())
+
+        if (directory.exists() && directory.isDirectory) {
+            val files = directory.listFiles()
+            if (files != null) {
+                for (file in files) {
+                    if (file.isFile && file.name.startsWith("ESMOG-") && file.extension == "json") {
+                        SharedDataSeries.dataSeriesList.add(FileInfo(file.name, file.length()))
+                    }
+                }
+            }
+        }
     }
 }

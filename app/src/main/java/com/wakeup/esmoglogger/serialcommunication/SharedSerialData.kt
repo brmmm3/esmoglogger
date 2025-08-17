@@ -7,7 +7,11 @@ object SharedSerialData {
     private val _command = MutableLiveData<String>()
     val command: LiveData<String> get() = _command
 
-    fun sendCommand(command: String) {
-        _command.value = command
+    fun start() {
+        _command.value = "start"
+    }
+
+    fun stop() {
+        _command.value = "stop"
     }
 }

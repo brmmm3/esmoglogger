@@ -12,21 +12,23 @@ import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.formatter.ValueFormatter
 import com.wakeup.esmoglogger.data.DataSeries
 
-class LineChartManager(lineChart: LineChart) {
+class LineChartManager(lineChart: LineChart, customRenderer: Boolean) {
     private val chart: LineChart = lineChart
     private var lvlDataSet = LineDataSet(ArrayList<Entry>(), "Level")
     private var frqDataSet = LineDataSet(ArrayList<Entry>(), "Frequency")
 
     init {
-        chart.renderer = CustomLineChartRenderer(chart, chart.animator, chart.viewPortHandler)
+        if (customRenderer) {
+            chart.renderer = CustomLineChartRenderer(chart, chart.animator, chart.viewPortHandler)
+        }
         chart.data = LineData()
 
         chart.isEnabled = true
         chart.visibility = View.VISIBLE
 
         // Basic chart setup
-        chart.description.text = "Live Daten"
-        //chart.getDescription().setEnabled(false) // Disable description
+        //chart.description.text = "ESmog data"
+        chart.description.isEnabled = false // Disable description
         chart.setTouchEnabled(true)
         chart.setDragEnabled(true) // Enable dragging
         chart.setScaleEnabled(true) // Enable scaling
@@ -131,30 +133,33 @@ class LineChartManager(lineChart: LineChart) {
         chart.axisLeft.isEnabled = show
         chart.resetViewPortOffsets()
         chart.fitScreen() // Reset zoom
+        chart.setVisibleXRangeMaximum(100f)
     }
 
     fun showFrequencyData(show: Boolean) {
         chart.axisRight.isEnabled = show
         chart.resetViewPortOffsets()
         chart.fitScreen() // Reset zoom
+        chart.setVisibleXRangeMaximum(100f)
     }
 
     private fun scaleAxisToLast100(values: ArrayList<Entry>): Float {
-        var max = 0.1f
-        values.takeLast(100).forEach { it ->
-            if (it.y > max) {
-                max = it.y
+        var ymax = 0.1f
+        val xmin = chart.getLowestVisibleX()
+        values.forEach { it ->
+            if (it.x >= xmin && it.y > ymax) {
+                ymax = it.y
             }
         }
-        return max
+        return ymax
     }
 
     fun resetScale() {
         chart.resetViewPortOffsets()
         chart.fitScreen() // Reset zoom
         chart.setVisibleXRangeMaximum(100f)
-        chart.axisLeft.mAxisMaximum = scaleAxisToLast100(lvlDataSet.values as ArrayList<Entry>)
-        chart.axisRight.mAxisMaximum = scaleAxisToLast100(frqDataSet.values as ArrayList<Entry>)
+        chart.axisLeft.axisMaximum = scaleAxisToLast100(lvlDataSet.values as ArrayList<Entry>)
+        chart.axisRight.axisMaximum = scaleAxisToLast100(frqDataSet.values as ArrayList<Entry>)
     }
 
     fun isEmpty(): Boolean {
@@ -172,16 +177,15 @@ class LineChartManager(lineChart: LineChart) {
         // TODO
     }
 
-    fun add(time: Float, value: Pair<Float, Int>) {
+    fun addChartPt(time: Float, level: Float, frequency: Int) {
         if (chart.axisLeft.isEnabled) {
-            val level = value.first
             lvlDataSet.addEntry(Entry(time, level))
             if (level > chart.axisLeft.mAxisMaximum) {
                 chart.axisLeft.mAxisMaximum = level
             }
         }
         if (chart.axisRight.isEnabled) {
-            val frequency = value.second.toFloat()
+            val frequency = frequency.toFloat()
             frqDataSet.addEntry(Entry(time, frequency))
             if (frequency > chart.axisRight.mAxisMaximum) {
                 chart.axisRight.mAxisMaximum = frequency

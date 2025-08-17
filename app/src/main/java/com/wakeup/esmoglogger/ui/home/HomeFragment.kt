@@ -3,8 +3,8 @@ package com.wakeup.esmoglogger.ui.home
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlertDialog
+import android.content.Context
 import android.content.pm.PackageManager
-import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -18,26 +18,26 @@ import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
+import com.google.android.material.switchmaterial.SwitchMaterial
+import com.wakeup.esmoglogger.ButtonSetEnabled
+import com.wakeup.esmoglogger.FileInfo
 import com.wakeup.esmoglogger.R
 import com.wakeup.esmoglogger.data.DataSeries
 import com.wakeup.esmoglogger.data.JsonViewModel
-import com.wakeup.esmoglogger.data.SharedESmogData
+import com.wakeup.esmoglogger.data.SharedDataSeries
 import com.wakeup.esmoglogger.databinding.FragmentHomeBinding
 import com.wakeup.esmoglogger.location.SharedLocationData
 import com.wakeup.esmoglogger.serialcommunication.SharedSerialData
-import com.wakeup.esmoglogger.ui.mapview.SharedMapData
+import java.io.File
+import java.text.DecimalFormat
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -55,7 +55,7 @@ class HomeFragment : Fragment() {
     private var startTime: LocalDateTime = LocalDateTime.now()
     private var isRecording = false
 
-    private lateinit var fileListAdapter: ArrayAdapter<String>
+    private lateinit var fileListAdapter: FileListAdapter
 
     private val jsonViewModel: JsonViewModel by viewModels()
 
@@ -66,14 +66,10 @@ class HomeFragment : Fragment() {
 
     private val writeRequestLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (isGranted) {
-            fileNameToSave?.let {
-                dataSeriesToSave?.let { dataSeries ->
-                    jsonViewModel.saveJsonToStorage(
-                        requireContext().contentResolver, requireContext(),
-                        it, dataSeries
-                    )
-                }
-            }
+            jsonViewModel.saveJsonToStorage(
+                requireContext().contentResolver, requireContext(),
+                fileNameToSave!!, dataSeriesToSave!!
+            )
         } else {
             Toast.makeText(requireContext(), "Speicherzugriff verweigert", Toast.LENGTH_SHORT).show()
         }
@@ -96,10 +92,8 @@ class HomeFragment : Fragment() {
             @SuppressLint("SetTextI18n")
             override fun onLocationResult(locationResult: LocationResult) {
                 locationResult.lastLocation?.let { location ->
-                    val latitude = location.latitude
-                    val longitude = location.longitude
-                    SharedESmogData.addGpsLocation(latitude, longitude)
-                    view?.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=$latitude  Lng=$longitude"
+                    SharedDataSeries.addGpsLocation(location)
+                    view?.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=${location.latitude}\nLng=${location.longitude}\nAlt=${location.altitude}"
                 }
             }
         }
@@ -112,27 +106,26 @@ class HomeFragment : Fragment() {
         binding = FragmentHomeBinding.inflate(inflater, container, false)
         val root: View = binding!!.getRoot()
 
-        val recordGpsCheckBox: MaterialCheckBox = root.findViewById(R.id.save_gps_checkbox)
+        val recordGpsEnabled: SwitchMaterial = root.findViewById(R.id.save_gps_enabled)
 
-        recordGpsCheckBox.setOnCheckedChangeListener { _, isChecked ->
+        recordGpsEnabled.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                SharedMapData.sendCommand("start")
+                SharedLocationData.start()
             } else {
-                root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=?  Lng=?"
-                SharedMapData.sendCommand("stop")
+                root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=?\nLng=?\nAlt=?"
+                SharedLocationData.stop()
             }
-            SharedESmogData.setGpsRecording(isChecked)
         }
         SharedLocationData.location.observe(viewLifecycleOwner) { location ->
-            root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=${location.latitude}  Lng=${location.longitude}"
+            root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=${location.latitude}\nLng=${location.longitude}\nAlt=${location.altitude}"
         }
 
         recordButton = root.findViewById<MaterialButton>(R.id.button_record)
         val setNotesButton = root.findViewById<MaterialButton>(R.id.button_set_notes)
         deleteButton = root.findViewById<MaterialButton>(R.id.button_delete)
-        deleteButton?.isEnabled = false
+        ButtonSetEnabled(deleteButton, false)
         saveButton = root.findViewById<MaterialButton>(R.id.button_save)
-        saveButton?.isEnabled = false
+        ButtonSetEnabled(saveButton, false)
 
         if (isRecording) {
             recordButton?.setIconResource(R.drawable.stop_32p)
@@ -142,18 +135,18 @@ class HomeFragment : Fragment() {
         recordButton?.setOnClickListener { v: View? ->
             isRecording = !isRecording
             if (isRecording) {
-                SharedSerialData.sendCommand("start")
+                SharedSerialData.start()
                 recordButton?.setIconResource(R.drawable.stop_32p)
-                recordGpsCheckBox.isEnabled = false
+                recordGpsEnabled.isEnabled = false
                 startTime = LocalDateTime.now()
-                SharedESmogData.start()
+                SharedDataSeries.start()
                 view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
                 handler.post(updateTimeRunnable)
             } else {
                 handler.removeCallbacks(updateTimeRunnable)
-                SharedSerialData.sendCommand("stop")
+                SharedSerialData.stop()
                 recordButton?.setIconResource(R.drawable.record_32p)
-                recordGpsCheckBox.isEnabled = true
+                recordGpsEnabled.isEnabled = true
                 val currentDateTime = LocalDateTime.now()
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                 showTextInputDialog(
@@ -185,11 +178,9 @@ class HomeFragment : Fragment() {
 
         val recordingsListView: ListView = root.findViewById(R.id.recordings_list_view)
 
-        val recordings = SharedESmogData.dataSeriesHistory.map { it.filename }.toCollection(ArrayList())
-        fileListAdapter = ArrayAdapter(
+        fileListAdapter = FileListAdapter(
             requireContext(),
-            android.R.layout.simple_list_item_1,
-            recordings
+            SharedDataSeries.dataSeriesList
         )
         recordingsListView.adapter = fileListAdapter
 
@@ -211,10 +202,10 @@ class HomeFragment : Fragment() {
             .setTitle("Delete recorded data")
             .setMessage("Do you want to delete recorded data?")
             .setPositiveButton("Yes") { _, _ ->
-                recordButton?.isEnabled = true
-                deleteButton?.isEnabled = false
-                saveButton?.isEnabled = false
-                SharedESmogData.clear()
+                ButtonSetEnabled(recordButton, true)
+                ButtonSetEnabled(deleteButton, false)
+                ButtonSetEnabled(saveButton, false)
+                SharedDataSeries.clear()
                 view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
             }
             .setNegativeButton("No") { dialog, _ ->
@@ -241,10 +232,10 @@ class HomeFragment : Fragment() {
                 if (text.isNotEmpty()) {
                     when (command) {
                         "stop" -> {
-                            SharedESmogData.stop(text)
-                            deleteButton?.isEnabled = true
-                            saveButton?.isEnabled = true
-                            recordButton?.isEnabled = false
+                            SharedDataSeries.stop(text)
+                            ButtonSetEnabled(recordButton, false)
+                            ButtonSetEnabled(deleteButton, true)
+                            ButtonSetEnabled(saveButton, true)
                         }
                         "save" -> {
                             try {
@@ -252,18 +243,18 @@ class HomeFragment : Fragment() {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || checkStoragePermission()) {
                                     jsonViewModel.saveJsonToStorage(
                                         requireContext().contentResolver, requireContext(),
-                                        fileName, SharedESmogData.dataSeries
+                                        fileName, SharedDataSeries.dataSeries
                                     )
                                 } else {
                                     fileNameToSave = fileName
-                                    dataSeriesToSave = SharedESmogData.dataSeries
+                                    dataSeriesToSave = SharedDataSeries.dataSeries
                                     writeRequestLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                                 }
-                                SharedESmogData.saved(fileName)
+                                SharedDataSeries.saved(FileInfo(fileName, File(fileName).length()))
                                 updateRecordingsList()
-                                deleteButton?.isEnabled = false
-                                saveButton?.isEnabled = false
-                                recordButton?.isEnabled = true
+                                ButtonSetEnabled(recordButton, true)
+                                ButtonSetEnabled(deleteButton, false)
+                                ButtonSetEnabled(saveButton, false)
                                 view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
                             } catch (e: Exception) {
                                 e.printStackTrace()
@@ -271,7 +262,7 @@ class HomeFragment : Fragment() {
                             }
                         }
                         "notes" -> {
-                            SharedESmogData.setNotes(text)
+                            SharedDataSeries.setNotes(text)
                         }
                     }
                 } else {
@@ -281,7 +272,7 @@ class HomeFragment : Fragment() {
             .setNegativeButton("Cancel") { dialog, _ ->
                 dialog.dismiss() // Dialog schließen
                 if (command == "stop") {
-                    SharedESmogData.dataSeries.clear()
+                    SharedDataSeries.dataSeries.clear()
                     view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
                 }
             }
@@ -296,10 +287,38 @@ class HomeFragment : Fragment() {
         }
     }
 
+    private class FileListAdapter(context: Context, private val files: List<FileInfo>) :
+        ArrayAdapter<FileInfo>(context, R.layout.list_item_file, files) {
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val view = convertView ?: LayoutInflater.from(context).inflate(R.layout.list_item_file, parent, false)
+            val fileInfo = files[position]
+
+            val fileNameTextView = view.findViewById<TextView>(R.id.fileNameTextView)
+            val fileSizeTextView = view.findViewById<TextView>(R.id.fileSizeTextView)
+
+            fileNameTextView.text = fileInfo.name
+            fileSizeTextView.text = formatFileSize(fileInfo.size)
+
+            return view
+        }
+
+        private fun formatFileSize(size: Long): String {
+            val kb = 1024.0
+            val mb = kb * 1024
+            val gb = mb * 1024
+            return when {
+                size >= gb -> "${DecimalFormat("#.##").format(size / gb)} GB"
+                size >= mb -> "${DecimalFormat("#.##").format(size / mb)} MB"
+                size >= kb -> "${DecimalFormat("#.##").format(size / kb)} KB"
+                else -> "$size bytes"
+            }
+        }
+    }
+
     private fun updateRecordingsList() {
-        val recordings = SharedESmogData.dataSeriesHistory.map { it.filename }.toCollection(ArrayList())
         fileListAdapter.clear()
-        fileListAdapter.addAll(recordings)
+        fileListAdapter.addAll(SharedDataSeries.dataSeriesList)
         fileListAdapter.notifyDataSetChanged()
     }
 }
