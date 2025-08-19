@@ -10,16 +10,18 @@ import androidx.core.content.ContextCompat
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
-import com.wakeup.esmoglogger.data.SharedDataSeries
+import com.wakeup.esmoglogger.isEmulator
 import com.wakeup.esmoglogger.ui.log.SharedLogData
 import java.io.InputStream
 import java.net.Socket
+import kotlin.random.Random
 
 class SerialCommunication(private val context: Context?) {
     private val usbManager: UsbManager = context!!.getSystemService(Context.USB_SERVICE) as UsbManager
     private var port: UsbSerialPort? = null
     private var socket: Socket? = null
     private var inputStream: InputStream? = null
+    private var stop = false
     private val ACTION_USB_PERMISSION = "com.example.USB_PERMISSION"
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -69,9 +71,8 @@ class SerialCommunication(private val context: Context?) {
     }
 
     fun setupConnection() {
-        // Detect emulator (simple check, adjust as needed)
-        val isEmulator = android.os.Build.FINGERPRINT.contains("generic") || android.os.Build.MODEL.contains("Emulator")
-        if (isEmulator) {
+        stop = false
+        if (isEmulator()) {
             setupTcpConnection()
         } else {
             setupUsbConnection()
@@ -104,15 +105,21 @@ class SerialCommunication(private val context: Context?) {
         }
     }
 
-    private fun setupTcpConnection(host: String = "10.0.2.2", port: Int = 12345) {
-        try {
-            socket = Socket(host, port)
-            inputStream = socket?.getInputStream()
-            SharedLogData.addLog("Connected to TCP server at $host:$port")
-            startReading()
-        } catch (e: Exception) {
-            SharedLogData.addLog("Connection error: ${e.message}")
-        }
+    private fun setupTcpConnection() {
+        Thread {
+            while (!Thread.currentThread().isInterrupted) {
+                if (stop) {
+                    break
+                }
+                try {
+                    SharedSerialData.addESmog(Random.nextInt(20000).toFloat() / 100f, Random.nextInt(5000))
+                    Thread.sleep(500)
+                } catch (e: Exception) {
+                    SharedLogData.addLog("Read error: ${e.message}")
+                    break
+                }
+            }
+        }.start()
     }
 
     private fun startReading() {
@@ -132,7 +139,7 @@ class SerialCommunication(private val context: Context?) {
                         // Frequency: 2050
                         try {
                             val (val1, val2) = receivedData.split(",")
-                            SharedDataSeries.addESmog(val1.toFloat(), val2.toInt())
+                            SharedSerialData.addESmog(val1.toFloat(), val2.toInt())
                         } catch (e: Exception) {
                             SharedLogData.addLog("Read error: ${e.message}")
                             break
@@ -161,6 +168,7 @@ class SerialCommunication(private val context: Context?) {
 
     fun closeConnection() {
         try {
+            stop = true
             if (port != null) {
                 closeUsbConnection()
             } else if (inputStream != null) {

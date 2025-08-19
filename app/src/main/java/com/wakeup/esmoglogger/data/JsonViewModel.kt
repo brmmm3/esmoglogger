@@ -1,5 +1,6 @@
 package com.wakeup.esmoglogger.data
 
+import android.annotation.SuppressLint
 import android.content.ContentResolver
 import android.content.ContentValues
 import android.os.Build
@@ -11,6 +12,7 @@ import java.io.File
 import java.io.FileWriter
 
 class JsonViewModel : ViewModel() {
+    @SuppressLint("ObsoleteSdkInt")
     fun saveJsonToStorage(contentResolver: ContentResolver, context: android.content.Context,
                           fileName: String, dataSeries: DataSeries) {
         try {

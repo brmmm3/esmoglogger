@@ -6,9 +6,14 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.wakeup.esmoglogger.R
-import com.wakeup.esmoglogger.data.SharedDataSeries
-import com.wakeup.esmoglogger.location.SharedLocationData
+import com.wakeup.esmoglogger.SharedViewModel
+import com.wakeup.esmoglogger.data.ESmogAndLocation
+import kotlinx.coroutines.launch
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -17,7 +22,9 @@ import org.osmdroid.views.overlay.Polyline
 
 
 class MapViewFragment : Fragment() {
+    private val viewModel: SharedViewModel by activityViewModels()
     private lateinit var mapView: MapView
+    private val values = arrayListOf<ESmogAndLocation>()
     private val pathSegments = mutableListOf<Polyline>()
     private lateinit var currentLocationMarker: Marker
 
@@ -31,7 +38,7 @@ class MapViewFragment : Fragment() {
         mapView = view.findViewById(R.id.map)
         mapView.setTileSource(TileSourceFactory.MAPNIK)
         mapView.setMultiTouchControls(true)
-        mapView.controller.setZoom(15.0)
+        mapView.controller.setZoom(viewModel.mapViewZoom)
 
         // Initialize marker for current location
         currentLocationMarker = Marker(mapView)
@@ -41,43 +48,57 @@ class MapViewFragment : Fragment() {
         // currentLocationMarker.setIcon(getDrawable(R.drawable.ic_marker))
         mapView.overlays.add(currentLocationMarker)
 
-        // Initialize location manager
-        SharedLocationData.location.observe(viewLifecycleOwner) { location ->
-            val geoPoint = GeoPoint(location.latitude, location.longitude)
-            val level = if (SharedDataSeries.dataSeries.esmogData.isEmpty()) {
-                0f
-            } else {
-                SharedDataSeries.dataSeries.esmogData.last().level
-            }
-            val color = if (level < 0.18) {
-                Color.GREEN
-            } else if (level < 5.8) {
-                Color.YELLOW
-            } else {
-                Color.RED
-            }
-            if (pathSegments.isEmpty() || pathSegments.last().color != color) {
-                val newPath = Polyline()
-                newPath.color = color
-                newPath.width = 8f
-                pathSegments.add(newPath)
-                mapView.overlays.add(newPath)
-            }
-            pathSegments.last().addPoint(geoPoint) // Add new point to the path
-            mapView.controller.setCenter(geoPoint) // Center map on current location
-            currentLocationMarker.position = geoPoint
-            mapView.invalidate() // Refresh map to show updated path
-        }
-
-        SharedLocationData.command.observe(viewLifecycleOwner) { command ->
-            if (command == "start") {
+        viewModel.gps.observe(viewLifecycleOwner) { enabled ->
+            if (enabled) {
                 onResume()
-            } else if (command == "stop") {
+            } else {
                 onPause()
             }
         }
 
         return view
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.locationAndESmogQueue.collect { value ->
+                    values.add(value)
+                    val geoPoint = GeoPoint(value.latitude, value.longitude)
+                    val level = value.level
+                    val color = if (level < 0.18) {
+                        Color.GREEN
+                    } else if (level < 5.8) {
+                        Color.YELLOW
+                    } else {
+                        Color.RED
+                    }
+                    if (pathSegments.isEmpty() || pathSegments.last().color != color) {
+                        val newPath = Polyline()
+                        newPath.color = color
+                        newPath.width = 8f
+                        pathSegments.add(newPath)
+                        mapView.overlays.add(newPath)
+                    }
+                    pathSegments.last().addPoint(geoPoint) // Add new point to the path
+                    mapView.controller.setCenter(geoPoint) // Center map on current location
+                    currentLocationMarker.position = geoPoint
+                    mapView.invalidate() // Refresh map to show updated path
+                }
+            }
+        }
+
+        Thread {
+            viewModel.dataSeries.data.forEach { value ->
+                viewModel.enqueueLocationAndESmog(value)
+            }
+        }.start()
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        viewModel.mapViewZoom = mapView.zoomLevelDouble
     }
 
     override fun onResume() {

@@ -1,26 +1,28 @@
+@file:Suppress("PrivatePropertyName")
+
 package com.wakeup.esmoglogger
 
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Environment
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.NavigationUI.setupActionBarWithNavController
 import androidx.navigation.ui.NavigationUI.setupWithNavController
-import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.wakeup.esmoglogger.databinding.ActivityMainBinding
 import com.wakeup.esmoglogger.serialcommunication.SerialCommunication
-import com.wakeup.esmoglogger.data.SharedDataSeries
 import com.wakeup.esmoglogger.location.LocationHandler
-import com.wakeup.esmoglogger.location.SharedLocationData
 import com.wakeup.esmoglogger.serialcommunication.SharedSerialData
-import com.wakeup.esmoglogger.ui.chartview.SharedChartData
 import com.wakeup.esmoglogger.ui.log.SharedLogData
+import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
+import kotlin.getValue
 
 /* https://hcfricke.com/2018/09/19/emf-11-cornet-ed88t-plus-ein-tri-meter-unter-200e-taugt-es-was/
 
@@ -32,12 +34,12 @@ import org.osmdroid.config.Configuration
     TETRA: um die 380-410MHz
 */
 
-data class FileInfo(val name: String, val size: Long)
 
 class MainActivity : AppCompatActivity() {
     private var binding: ActivityMainBinding? = null
     private var serial: SerialCommunication? = null
     private lateinit var locationHandler: LocationHandler
+    private val viewModel: SharedViewModel by viewModels()
 
     private val STORAGE_PERMISSION_REQUEST_CODE = 1001
 
@@ -72,25 +74,27 @@ class MainActivity : AppCompatActivity() {
         SharedLogData.addLog("Setup Serial")
         serial = SerialCommunication(this)
         SharedSerialData.command.observe(this) { command ->
-            if (command == "start") {
+            if (command) {
                 serial?.setupConnection()
-            } else if (command == "stop") {
+            } else {
                 serial?.closeConnection()
             }
         }
-
-        SharedDataSeries.esmog.observe(this) { esmog ->
-            SharedChartData.add(esmog)
+        this.lifecycleScope.launch {
+            SharedSerialData.esmog.collect { lvlFrq ->
+                viewModel.addESmog(lvlFrq.first, lvlFrq.second)
+            }
         }
 
         locationHandler = LocationHandler(this) { location ->
-            SharedLocationData.sendLocation(location)
+            viewModel.addLocation(location)
         }
-        SharedLocationData.command.observe(this) { command ->
-            if (command == "start") {
+
+        viewModel.gps.observe(this) { enabled ->
+            if (enabled) {
                 locationHandler.initialize()
                 locationHandler.resume()
-            } else if (command == "stop") {
+            } else {
                 locationHandler.pause()
             }
         }
@@ -121,7 +125,7 @@ class MainActivity : AppCompatActivity() {
         // Use public Downloads directory (or change to context.getExternalFilesDir(null) for app-specific storage)
         val directory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
 
-        SharedDataSeries.dataSeriesList.addAll(directory.listFiles()?.filter { it.exists() && it.name.startsWith("ESMOG-") && it.extension == "json" }?.map {
+        viewModel.dataSeriesList.addAll(directory.listFiles()?.filter { it.exists() && it.name.startsWith("ESMOG-") && it.extension == "json" }?.map {
             FileInfo(it.name, it.length())
         } ?: emptyList())
 
@@ -130,7 +134,7 @@ class MainActivity : AppCompatActivity() {
             if (files != null) {
                 for (file in files) {
                     if (file.isFile && file.name.startsWith("ESMOG-") && file.extension == "json") {
-                        SharedDataSeries.dataSeriesList.add(FileInfo(file.name, file.length()))
+                        viewModel.dataSeriesList.add(FileInfo(file.name, file.length()))
                     }
                 }
             }

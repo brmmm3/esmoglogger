@@ -6,9 +6,15 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.CopyOnWriteArrayList
 
-data class ESmog(val time: Float, val level: Float, val frequency: Int) {}
+data class ESmog(val time: Float,
+                 val level: Float, val frequency: Int)
 
-data class GpsLocation(val time: Float, val latitude: Double, val longitude: Double, val altitude: Double)
+data class GpsLocation(val time: Float,
+                       val latitude: Double, val longitude: Double, val altitude: Double)
+
+data class ESmogAndLocation(val time: Float,
+                            val level: Float, val frequency: Int,
+                            val latitude: Double, val longitude: Double, val altitude: Double)
 
 class DataSeries {
     var startTime: LocalDateTime = LocalDateTime.now()
@@ -18,28 +24,28 @@ class DataSeries {
     var version: Int = 0
     // Device name
     var device = ""
-    var esmogData: CopyOnWriteArrayList<ESmog> = CopyOnWriteArrayList()
-    var gpsLocations: CopyOnWriteArrayList<GpsLocation> = CopyOnWriteArrayList()
+    var data: CopyOnWriteArrayList<ESmogAndLocation> = CopyOnWriteArrayList()
     // Data series notes
     var seriesNotes = ""
     // Filename. If empty dataseries is not saved
     var filename = ""
 
     fun clear() {
-        esmogData = CopyOnWriteArrayList()
+        data = CopyOnWriteArrayList()
     }
 
     fun start() {
-        esmogData = CopyOnWriteArrayList()
+        data = CopyOnWriteArrayList()
         startTime = LocalDateTime.now()
     }
 
-    fun addESmog(lvlFrq: ESmog) {
-        esmogData.add(lvlFrq)
+    fun add(value: ESmogAndLocation) {
+        data.add(value)
     }
 
-    fun addGpsLocation(location: GpsLocation) {
-        gpsLocations.add(location)
+    fun add(time: Float, level: Float, frequency: Int,
+            latitude: Double, longitude: Double, altitude: Double) {
+        data.add(ESmogAndLocation(time, level, frequency, latitude, longitude, altitude))
     }
 
     fun stop(name: String) {
@@ -60,27 +66,17 @@ class DataSeries {
         if (!seriesNotes.isEmpty()) {
             jsonObject.put("notes", seriesNotes)
         }
-        if (!esmogData.isEmpty()) {
-            jsonObject.put("lvlfrq",
+        if (!data.isEmpty()) {
+            jsonObject.put("data",
                 JSONArray().apply {
-                    esmogData.forEach { lvlFrq ->
-                    put(JSONArray().apply {
-                        put(lvlFrq.time)
-                        put(lvlFrq.level)
-                        put(lvlFrq.frequency)
-                    })
-                }
-            })
-        }
-        if (!gpsLocations.isEmpty()) {
-            jsonObject.put("location",
-                JSONArray().apply {
-                    gpsLocations.forEach { location ->
+                    data.forEach { value ->
                         put(JSONArray().apply {
-                            put(location.time)
-                            put(location.latitude)
-                            put(location.longitude)
-                            put(location.altitude)
+                            put(value.time)
+                            put(value.level)
+                            put(value.frequency)
+                            put(value.latitude)
+                            put(value.longitude)
+                            put(value.altitude)
                         })
                     }
                 })

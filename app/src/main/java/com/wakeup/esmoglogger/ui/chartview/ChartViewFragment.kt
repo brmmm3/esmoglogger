@@ -8,11 +8,19 @@ import android.widget.AdapterView
 import android.widget.Button
 import android.widget.Spinner
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.github.mikephil.charting.charts.LineChart
 import com.wakeup.esmoglogger.R
+import com.wakeup.esmoglogger.SharedViewModel
+import kotlinx.coroutines.launch
+import kotlin.getValue
 
 
 class ChartViewFragment : Fragment() {
+    private val viewModel: SharedViewModel by activityViewModels()
     private lateinit var lineChart: LineChart
     private lateinit var lineChart2: LineChart
     private var chartManager: LineChartManager? = null
@@ -24,20 +32,27 @@ class ChartViewFragment : Fragment() {
     ): View? {
         val view = inflater.inflate(R.layout.fragment_chart, container, false)
 
+        if (::lineChart.isInitialized) {
+            return view
+        }
+
         // Initialize first line chart
         lineChart = view.findViewById(R.id.line_chart)
         chartManager = LineChartManager(lineChart, true)
-        SharedChartData.data.observe(viewLifecycleOwner) { lvlFrq ->
-            chartManager?.addChartPt(lvlFrq.time, lvlFrq.level, lvlFrq.frequency)
-        }
 
         // Initialize second line chart
         lineChart2 = view.findViewById(R.id.line_chart2)
         chartManager2 = LineChartManager(lineChart2, false)
         chartManager2?.showLevelData(false)
         chartManager2?.showFrequencyData(true)
-        SharedChartData.data.observe(viewLifecycleOwner) { lvlFrq ->
-            chartManager2?.addChartPt(lvlFrq.time, lvlFrq.level, lvlFrq.frequency)
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.locationAndESmogQueue.collect { value ->
+                    chartManager?.addChartPt(value.time, value.level, value.frequency)
+                    chartManager2?.addChartPt(value.time, value.level, value.frequency)
+                }
+            }
         }
 
         val resetScaleButton = view.findViewById<Button>(R.id.button_reset_scale)
@@ -64,6 +79,15 @@ class ChartViewFragment : Fragment() {
         }
 
         return view
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        Thread {
+            viewModel.dataSeries.data.forEach { value ->
+                viewModel.enqueueLocationAndESmog(value)
+            }
+        }.start()
     }
 
     override fun onDestroyView() {

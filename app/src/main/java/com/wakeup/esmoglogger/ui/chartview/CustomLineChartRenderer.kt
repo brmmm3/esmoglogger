@@ -39,7 +39,7 @@ class CustomLineChartRenderer(
         val zeroLine = transformer.getPixelForValues(0f, 0f).y.toFloat()
         val greenArea = transformer.getPixelForValues(0f, 0.18f).y.toFloat()
         val yellowArea = transformer.getPixelForValues(0f, 5.8f).y.toFloat()
-        val redArea = transformer.getPixelForValues(0f, 200f).y.toFloat()
+        val redArea = transformer.getPixelForValues(0f, 180f).y.toFloat()
 
         // Rechtecke für die Hintergrundbereiche zeichnen
         val viewPort = mViewPortHandler.contentRect

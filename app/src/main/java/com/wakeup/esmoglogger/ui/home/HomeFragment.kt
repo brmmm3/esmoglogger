@@ -19,7 +19,11 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -27,15 +31,15 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.material.switchmaterial.SwitchMaterial
-import com.wakeup.esmoglogger.ButtonSetEnabled
+import com.wakeup.esmoglogger.buttonSetEnabled
 import com.wakeup.esmoglogger.FileInfo
 import com.wakeup.esmoglogger.R
+import com.wakeup.esmoglogger.SharedViewModel
 import com.wakeup.esmoglogger.data.DataSeries
 import com.wakeup.esmoglogger.data.JsonViewModel
-import com.wakeup.esmoglogger.data.SharedDataSeries
 import com.wakeup.esmoglogger.databinding.FragmentHomeBinding
-import com.wakeup.esmoglogger.location.SharedLocationData
 import com.wakeup.esmoglogger.serialcommunication.SharedSerialData
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.DecimalFormat
 import java.time.Duration
@@ -44,6 +48,7 @@ import java.time.format.DateTimeFormatter
 import kotlin.getValue
 
 class HomeFragment : Fragment() {
+    private val viewModel: SharedViewModel by activityViewModels()
     private var binding: FragmentHomeBinding? = null
     private var recordButton: MaterialButton? = null
     private var deleteButton: MaterialButton? = null
@@ -92,7 +97,7 @@ class HomeFragment : Fragment() {
             @SuppressLint("SetTextI18n")
             override fun onLocationResult(locationResult: LocationResult) {
                 locationResult.lastLocation?.let { location ->
-                    SharedDataSeries.addGpsLocation(location)
+                    viewModel.addLocation(location)
                     view?.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=${location.latitude}\nLng=${location.longitude}\nAlt=${location.altitude}"
                 }
             }
@@ -106,26 +111,32 @@ class HomeFragment : Fragment() {
         binding = FragmentHomeBinding.inflate(inflater, container, false)
         val root: View = binding!!.getRoot()
 
-        val recordGpsEnabled: SwitchMaterial = root.findViewById(R.id.save_gps_enabled)
+        val gpsEnabled: SwitchMaterial = root.findViewById(R.id.save_gps_enabled)
 
-        recordGpsEnabled.setOnCheckedChangeListener { _, isChecked ->
+        gpsEnabled.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                SharedLocationData.start()
+                viewModel.startGps()
             } else {
                 root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=?\nLng=?\nAlt=?"
-                SharedLocationData.stop()
+                viewModel.stopGps()
             }
         }
-        SharedLocationData.location.observe(viewLifecycleOwner) { location ->
-            root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=${location.latitude}\nLng=${location.longitude}\nAlt=${location.altitude}"
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.locationAndESmogQueue.collect { value ->
+                    root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=${value.latitude}\nLng=${value.longitude}\nAlt=${value.altitude}"
+                }
+            }
         }
+        val value = viewModel.location.value
+        value?.let { root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=${it.latitude}\nLng=${value.longitude}\nAlt=${value.altitude}" }
 
         recordButton = root.findViewById<MaterialButton>(R.id.button_record)
         val setNotesButton = root.findViewById<MaterialButton>(R.id.button_set_notes)
         deleteButton = root.findViewById<MaterialButton>(R.id.button_delete)
-        ButtonSetEnabled(deleteButton, false)
+        buttonSetEnabled(deleteButton, false)
         saveButton = root.findViewById<MaterialButton>(R.id.button_save)
-        ButtonSetEnabled(saveButton, false)
+        buttonSetEnabled(saveButton, false)
 
         if (isRecording) {
             recordButton?.setIconResource(R.drawable.stop_32p)
@@ -137,16 +148,16 @@ class HomeFragment : Fragment() {
             if (isRecording) {
                 SharedSerialData.start()
                 recordButton?.setIconResource(R.drawable.stop_32p)
-                recordGpsEnabled.isEnabled = false
+                gpsEnabled.isEnabled = false
                 startTime = LocalDateTime.now()
-                SharedDataSeries.start()
+                viewModel.startRecording()
                 view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
                 handler.post(updateTimeRunnable)
             } else {
                 handler.removeCallbacks(updateTimeRunnable)
                 SharedSerialData.stop()
                 recordButton?.setIconResource(R.drawable.record_32p)
-                recordGpsEnabled.isEnabled = true
+                gpsEnabled.isEnabled = true
                 val currentDateTime = LocalDateTime.now()
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                 showTextInputDialog(
@@ -180,7 +191,7 @@ class HomeFragment : Fragment() {
 
         fileListAdapter = FileListAdapter(
             requireContext(),
-            SharedDataSeries.dataSeriesList
+            viewModel.dataSeriesList
         )
         recordingsListView.adapter = fileListAdapter
 
@@ -202,10 +213,10 @@ class HomeFragment : Fragment() {
             .setTitle("Delete recorded data")
             .setMessage("Do you want to delete recorded data?")
             .setPositiveButton("Yes") { _, _ ->
-                ButtonSetEnabled(recordButton, true)
-                ButtonSetEnabled(deleteButton, false)
-                ButtonSetEnabled(saveButton, false)
-                SharedDataSeries.clear()
+                buttonSetEnabled(recordButton, true)
+                buttonSetEnabled(deleteButton, false)
+                buttonSetEnabled(saveButton, false)
+                viewModel.clear()
                 view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
             }
             .setNegativeButton("No") { dialog, _ ->
@@ -232,10 +243,10 @@ class HomeFragment : Fragment() {
                 if (text.isNotEmpty()) {
                     when (command) {
                         "stop" -> {
-                            SharedDataSeries.stop(text)
-                            ButtonSetEnabled(recordButton, false)
-                            ButtonSetEnabled(deleteButton, true)
-                            ButtonSetEnabled(saveButton, true)
+                            viewModel.stopRecording(text)
+                            buttonSetEnabled(recordButton, false)
+                            buttonSetEnabled(deleteButton, true)
+                            buttonSetEnabled(saveButton, true)
                         }
                         "save" -> {
                             try {
@@ -243,18 +254,18 @@ class HomeFragment : Fragment() {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || checkStoragePermission()) {
                                     jsonViewModel.saveJsonToStorage(
                                         requireContext().contentResolver, requireContext(),
-                                        fileName, SharedDataSeries.dataSeries
+                                        fileName, viewModel.dataSeries
                                     )
                                 } else {
                                     fileNameToSave = fileName
-                                    dataSeriesToSave = SharedDataSeries.dataSeries
+                                    dataSeriesToSave = viewModel.dataSeries
                                     writeRequestLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                                 }
-                                SharedDataSeries.saved(FileInfo(fileName, File(fileName).length()))
+                                viewModel.saved(FileInfo(fileName, File(fileName).length()))
                                 updateRecordingsList()
-                                ButtonSetEnabled(recordButton, true)
-                                ButtonSetEnabled(deleteButton, false)
-                                ButtonSetEnabled(saveButton, false)
+                                buttonSetEnabled(recordButton, true)
+                                buttonSetEnabled(deleteButton, false)
+                                buttonSetEnabled(saveButton, false)
                                 view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
                             } catch (e: Exception) {
                                 e.printStackTrace()
@@ -262,7 +273,7 @@ class HomeFragment : Fragment() {
                             }
                         }
                         "notes" -> {
-                            SharedDataSeries.setNotes(text)
+                            viewModel.setNotes(text)
                         }
                     }
                 } else {
@@ -272,13 +283,14 @@ class HomeFragment : Fragment() {
             .setNegativeButton("Cancel") { dialog, _ ->
                 dialog.dismiss() // Dialog schließen
                 if (command == "stop") {
-                    SharedDataSeries.dataSeries.clear()
+                    viewModel.dataSeries.clear()
                     view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
                 }
             }
             .show()
     }
 
+    @SuppressLint("ObsoleteSdkInt")
     private fun checkStoragePermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             true // Keine Berechtigung erforderlich für MediaStore ab Android 10
@@ -318,7 +330,7 @@ class HomeFragment : Fragment() {
 
     private fun updateRecordingsList() {
         fileListAdapter.clear()
-        fileListAdapter.addAll(SharedDataSeries.dataSeriesList)
+        fileListAdapter.addAll(viewModel.dataSeriesList)
         fileListAdapter.notifyDataSetChanged()
     }
 }
