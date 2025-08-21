@@ -19,6 +19,8 @@
     <string name="recorded_time_0s">0 s</string>
     <string name="title_map">Map</string>
     <string name="dark_theme">Dark Theme</string>
+    <string name="delete">Delete</string>
+    <string name="share">Share</string>
     <string-array name="chart_view_options">
         <item>Lvl</item>
         <item>Frq</item>

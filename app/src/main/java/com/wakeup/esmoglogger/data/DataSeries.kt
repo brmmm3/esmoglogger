@@ -1,10 +1,12 @@
 package com.wakeup.esmoglogger.data
 
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.Float
 
 data class ESmog(val time: Float,
                  val level: Float, val frequency: Int)
@@ -63,24 +65,58 @@ class DataSeries {
         jsonObject.put("device", device)
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         jsonObject.put("start", startTime.format(formatter))
+        jsonObject.put("count", data.size)
         if (!seriesNotes.isEmpty()) {
             jsonObject.put("notes", seriesNotes)
         }
         if (!data.isEmpty()) {
-            jsonObject.put("data",
-                JSONArray().apply {
-                    data.forEach { value ->
-                        put(JSONArray().apply {
-                            put(value.time)
-                            put(value.level)
-                            put(value.frequency)
-                            put(value.latitude)
-                            put(value.longitude)
-                            put(value.altitude)
-                        })
-                    }
-                })
+            val jsonData = JSONArray().apply {
+                data.forEach { value ->
+                    put(JSONArray().apply {
+                        put(value.time)
+                        put(value.level)
+                        put(value.frequency)
+                        put(value.latitude)
+                        put(value.longitude)
+                        put(value.altitude)
+                    })
+                }
+            }
+            val compressedData = JsonCompressor.compressJson(jsonData)
+            if (compressedData != null) {
+                Log.d("DataSeries", "Compressed size: ${compressedData.size} bytes")
+                jsonObject.put("data",compressedData.toString())
+            } else {
+                Log.e("DataSeries", "Failed to compress JSON")
+            }
         }
         return jsonObject
+    }
+
+    fun fromJson(jsonObject: JSONObject) {
+        name = jsonObject.optString("name")
+        version = jsonObject.getInt("version")
+        device = jsonObject.optString("device")
+        startTime = jsonObject.get("start") as LocalDateTime
+        seriesNotes = jsonObject.optString("notes")
+        try {
+            val jsonArray = JsonCompressor.decompressJson(jsonObject.optString("data").encodeToByteArray()) ?: JSONArray()
+            val newData: CopyOnWriteArrayList<ESmogAndLocation> = CopyOnWriteArrayList()
+            for (i in 0 until jsonArray.length()) {
+                val jsonObject = jsonArray.getJSONArray(i) ?: continue
+                newData.add(ESmogAndLocation(
+                    jsonObject.get(0) as Float,
+                    jsonObject.get(1) as Float,
+                    jsonObject.get(2) as Int,
+                    jsonObject.get(3) as Double,
+                    jsonObject.get(4) as Double,
+                    jsonObject.get(5) as Double
+                ))
+            }
+            data = newData
+        } catch (e: Exception) {
+            Log.e("DataSeries", "Failed to parse JSONArray: ${e.message}", e)
+            null
+        }
     }
 }

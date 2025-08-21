@@ -144,4 +144,43 @@
         android:divider="@android:color/darker_gray"
         android:dividerHeight="1dp" />
 
+    <LinearLayout
+        android:id="@+id/action_buttons_recordings"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:visibility="gone">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_load_recordings"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:text="@string/delete"
+            android:drawableStart="@android:drawable/ic_menu_delete"
+            android:padding="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_delete_recordings"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:text="@string/delete"
+            android:drawableStart="@android:drawable/ic_menu_delete"
+            android:padding="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_share_recordings"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="@string/share"
+            android:drawableStart="@android:drawable/ic_menu_share"
+            android:padding="8dp" />
+
+    </LinearLayout>
+
 </LinearLayout>

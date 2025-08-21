@@ -67,7 +67,9 @@ class MapViewFragment : Fragment() {
                     values.add(value)
                     val geoPoint = GeoPoint(value.latitude, value.longitude)
                     val level = value.level
-                    val color = if (level < 0.18) {
+                    val color = if (value.frequency == 0) {
+                        Color.GRAY
+                    } else if (level < 0.18) {
                         Color.GREEN
                     } else if (level < 5.8) {
                         Color.YELLOW

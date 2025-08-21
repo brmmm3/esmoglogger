@@ -75,20 +75,30 @@ class SharedViewModel: ViewModel() {
         val dt = Duration.between(dataSeries.startTime, LocalDateTime.now()).toMillis().toFloat() / 1000f
         val gpsLocation: GpsLocation = location.value ?: GpsLocation(0f, 0.0, 0.0, 0.0)
         val value = ESmogAndLocation(dt, level, frequency, gpsLocation.latitude, gpsLocation.longitude, gpsLocation.altitude)
+        _esmog.postValue(ESmog(dt, level, frequency))
         viewModelScope.launch {
             _locationAndESmogQueue.emit(value)
         }
-        dataSeries.add(value)
+        if (recording.value == true) {
+            dataSeries.add(value)
+        }
     }
 
     fun addLocation(location: Location) {
         val dt = Duration.between(dataSeries.startTime, LocalDateTime.now()).toMillis().toFloat() / 1000f
-        val esmog: ESmog = esmog.value ?: ESmog(0f, 0f, 0)
+        val esmog: ESmog = if (recording.value == true) {
+            esmog.value ?: ESmog(0f, 0f, 0)
+        } else {
+            ESmog(0f, 0f, 0)
+        }
         val value = ESmogAndLocation(dt, esmog.level, esmog.frequency, location.latitude, location.longitude, location.altitude)
+        _location.postValue(GpsLocation(dt, location.latitude, location.longitude, location.altitude))
         viewModelScope.launch {
             _locationAndESmogQueue.emit(value)
         }
-        dataSeries.add(value)
+        if (recording.value == true) {
+            dataSeries.add(value)
+        }
     }
 
     fun setNotes(notes: String) {

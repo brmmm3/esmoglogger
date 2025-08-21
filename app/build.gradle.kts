@@ -55,6 +55,7 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.play.services.location)
     implementation(libs.osmdroid.android)
+    implementation(libs.zstd.jni)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

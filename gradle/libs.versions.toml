@@ -20,6 +20,7 @@ coreKtx = "1.16.0"
 usbSerialForAndroidVersion = "3.6.0"
 recyclerview = "1.4.0"
 activityKtx = "1.10.1"
+zstdJni = "1.5.7-4"
 
 [libraries]
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
@@ -41,6 +42,7 @@ core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.16.0" }
 usb-serial-for1-android-v360 = { module = "com.github.mik3y:usb-serial-for-android", version.ref = "usbSerialForAndroidVersion" }
 recyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "recyclerview" }
 activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }
+zstd-jni = { module = "com.github.luben:zstd-jni", version.ref = "zstdJni" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

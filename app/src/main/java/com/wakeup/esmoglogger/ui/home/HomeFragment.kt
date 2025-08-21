@@ -7,17 +7,22 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.util.SparseBooleanArray
+import android.view.ActionMode
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -46,19 +51,25 @@ import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.getValue
+import androidx.core.util.size
 
 class HomeFragment : Fragment() {
     private val viewModel: SharedViewModel by activityViewModels()
     private var binding: FragmentHomeBinding? = null
-    private var recordButton: MaterialButton? = null
-    private var deleteButton: MaterialButton? = null
-    private var saveButton: MaterialButton? = null
+    private lateinit var buttonRecord: MaterialButton
+    private lateinit var buttonDelete: MaterialButton
+    private lateinit var buttonSave: MaterialButton
+    private lateinit var recordingsListView: ListView
+    private lateinit var actionButtonsRecordings: LinearLayout
+    private lateinit var buttonLoadRecordings: MaterialButton
+    private lateinit var buttonDeleteRecordings: MaterialButton
+    private lateinit var buttonShareRecordings: MaterialButton
+    private var actionMode: ActionMode? = null
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
 
     private var startTime: LocalDateTime = LocalDateTime.now()
-    private var isRecording = false
 
     private lateinit var fileListAdapter: FileListAdapter
 
@@ -131,32 +142,23 @@ class HomeFragment : Fragment() {
         val value = viewModel.location.value
         value?.let { root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=${it.latitude}\nLng=${value.longitude}\nAlt=${value.altitude}" }
 
-        recordButton = root.findViewById<MaterialButton>(R.id.button_record)
+        buttonRecord = root.findViewById<MaterialButton>(R.id.button_record)
         val setNotesButton = root.findViewById<MaterialButton>(R.id.button_set_notes)
-        deleteButton = root.findViewById<MaterialButton>(R.id.button_delete)
-        buttonSetEnabled(deleteButton, false)
-        saveButton = root.findViewById<MaterialButton>(R.id.button_save)
-        buttonSetEnabled(saveButton, false)
+        buttonDelete = root.findViewById<MaterialButton>(R.id.button_delete)
+        buttonSetEnabled(buttonDelete, false)
+        buttonSave = root.findViewById<MaterialButton>(R.id.button_save)
+        buttonSetEnabled(buttonSave, false)
 
-        if (isRecording) {
-            recordButton?.setIconResource(R.drawable.stop_32p)
+        if (viewModel.recording.value == true) {
+            buttonRecord.setIconResource(R.drawable.stop_32p)
         } else {
-            recordButton?.setIconResource(R.drawable.record_32p)
+            buttonRecord.setIconResource(R.drawable.record_32p)
         }
-        recordButton?.setOnClickListener { v: View? ->
-            isRecording = !isRecording
-            if (isRecording) {
-                SharedSerialData.start()
-                recordButton?.setIconResource(R.drawable.stop_32p)
-                gpsEnabled.isEnabled = false
-                startTime = LocalDateTime.now()
-                viewModel.startRecording()
-                view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
-                handler.post(updateTimeRunnable)
-            } else {
+        buttonRecord.setOnClickListener { v: View? ->
+            if (viewModel.recording.value == true) {
                 handler.removeCallbacks(updateTimeRunnable)
                 SharedSerialData.stop()
-                recordButton?.setIconResource(R.drawable.record_32p)
+                buttonRecord.setIconResource(R.drawable.record_32p)
                 gpsEnabled.isEnabled = true
                 val currentDateTime = LocalDateTime.now()
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
@@ -164,6 +166,14 @@ class HomeFragment : Fragment() {
                     "Name of recording", "Enter name of recording",
                     "stop", currentDateTime.format(formatter), true
                 )
+            } else {
+                SharedSerialData.start()
+                buttonRecord.setIconResource(R.drawable.stop_32p)
+                gpsEnabled.isEnabled = false
+                startTime = LocalDateTime.now()
+                viewModel.startRecording()
+                view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
+                handler.post(updateTimeRunnable)
             }
         }
 
@@ -174,11 +184,11 @@ class HomeFragment : Fragment() {
             )
         }
 
-        deleteButton?.setOnClickListener { v: View? ->
+        buttonDelete.setOnClickListener { v: View? ->
             showConfirmationDialog()
         }
 
-        saveButton?.setOnClickListener { v: View? ->
+        buttonSave.setOnClickListener { v: View? ->
             val currentDateTime = LocalDateTime.now()
             val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd.HH_mm_ss")
             showTextInputDialog(
@@ -187,17 +197,65 @@ class HomeFragment : Fragment() {
             )
         }
 
-        val recordingsListView: ListView = root.findViewById(R.id.recordings_list_view)
+        recordingsListView = root.findViewById(R.id.recordings_list_view)
 
         fileListAdapter = FileListAdapter(
             requireContext(),
+            recordingsListView,
             viewModel.dataSeriesList
         )
         recordingsListView.adapter = fileListAdapter
+        recordingsListView.choiceMode = ListView.CHOICE_MODE_MULTIPLE
 
         recordingsListView.setOnItemClickListener { _, _, position, _ ->
             val text = fileListAdapter.getItem(position) ?: return@setOnItemClickListener
             println(text)
+            recordingsListView.setItemChecked(position, recordingsListView.isItemChecked(position))
+            fileListAdapter.notifyDataSetChanged()
+            updateButtonVisibility()
+        }
+
+        recordingsListView.setOnItemLongClickListener { _, _, position, _ ->
+            recordingsListView.setItemChecked(position, !recordingsListView.isItemChecked(position))
+            fileListAdapter.notifyDataSetChanged()
+            updateButtonVisibility()
+            true
+        }
+
+        actionButtonsRecordings = root.findViewById<LinearLayout>(R.id.action_buttons_recordings)
+        buttonLoadRecordings = root.findViewById<MaterialButton>(R.id.button_load_recordings)
+        buttonDeleteRecordings = root.findViewById<MaterialButton>(R.id.button_delete_recordings)
+        buttonShareRecordings = root.findViewById<MaterialButton>(R.id.button_share_recordings)
+
+        buttonLoadRecordings.setOnClickListener {  }
+
+        buttonDeleteRecordings.setOnClickListener {
+            val selectedItems = getSelectedItems()
+            val fileIndex = HashMap<String, Int>()
+            viewModel.dataSeriesList.forEachIndexed { index, fileInfo ->
+                fileIndex.put(fileInfo.name, index)
+            }
+            val sdCard = Environment.getExternalStorageDirectory()
+            selectedItems.reversed().forEach { name ->
+                if (File(sdCard, "${Environment.DIRECTORY_DOCUMENTS}/${name}").delete()) {
+                    fileIndex.get(name)?.let { index -> viewModel.dataSeriesList.removeAt(index) }
+                }
+            }
+            clearSelections()
+            fileListAdapter.notifyDataSetChanged()
+            updateButtonVisibility()
+        }
+
+        buttonShareRecordings.setOnClickListener {
+            val selectedItems = getSelectedItems()
+            val shareText = selectedItems.joinToString(", ")
+            val shareIntent = android.content.Intent().apply {
+                action = android.content.Intent.ACTION_SEND
+                putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                type = "text/plain"
+            }
+            startActivity(android.content.Intent.createChooser(shareIntent, "Share items"))
+            clearSelections()
         }
 
         return root
@@ -213,9 +271,9 @@ class HomeFragment : Fragment() {
             .setTitle("Delete recorded data")
             .setMessage("Do you want to delete recorded data?")
             .setPositiveButton("Yes") { _, _ ->
-                buttonSetEnabled(recordButton, true)
-                buttonSetEnabled(deleteButton, false)
-                buttonSetEnabled(saveButton, false)
+                buttonSetEnabled(buttonRecord, true)
+                buttonSetEnabled(buttonDelete, false)
+                buttonSetEnabled(buttonSave, false)
                 viewModel.clear()
                 view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
             }
@@ -244,9 +302,9 @@ class HomeFragment : Fragment() {
                     when (command) {
                         "stop" -> {
                             viewModel.stopRecording(text)
-                            buttonSetEnabled(recordButton, false)
-                            buttonSetEnabled(deleteButton, true)
-                            buttonSetEnabled(saveButton, true)
+                            buttonSetEnabled(buttonRecord, false)
+                            buttonSetEnabled(buttonDelete, true)
+                            buttonSetEnabled(buttonSave, true)
                         }
                         "save" -> {
                             try {
@@ -263,9 +321,9 @@ class HomeFragment : Fragment() {
                                 }
                                 viewModel.saved(FileInfo(fileName, File(fileName).length()))
                                 updateRecordingsList()
-                                buttonSetEnabled(recordButton, true)
-                                buttonSetEnabled(deleteButton, false)
-                                buttonSetEnabled(saveButton, false)
+                                buttonSetEnabled(buttonRecord, true)
+                                buttonSetEnabled(buttonDelete, false)
+                                buttonSetEnabled(buttonSave, false)
                                 view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
                             } catch (e: Exception) {
                                 e.printStackTrace()
@@ -283,6 +341,7 @@ class HomeFragment : Fragment() {
             .setNegativeButton("Cancel") { dialog, _ ->
                 dialog.dismiss() // Dialog schließen
                 if (command == "stop") {
+                    viewModel.stopRecording("")
                     viewModel.dataSeries.clear()
                     view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
                 }
@@ -299,16 +358,21 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private class FileListAdapter(context: Context, private val files: List<FileInfo>) :
+    private class FileListAdapter(context: Context, private val listView: ListView, private val files: List<FileInfo>) :
         ArrayAdapter<FileInfo>(context, R.layout.list_item_file, files) {
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val view = convertView ?: LayoutInflater.from(context).inflate(R.layout.list_item_file, parent, false)
-            val fileInfo = files[position]
 
+            val isSelected = listView.checkedItemPositions[position]
+            view.setBackgroundColor(
+                if (isSelected) ContextCompat.getColor(context, android.R.color.holo_blue_light)
+                else ContextCompat.getColor(context, android.R.color.transparent)
+            )
+
+            val fileInfo = files[position]
             val fileNameTextView = view.findViewById<TextView>(R.id.fileNameTextView)
             val fileSizeTextView = view.findViewById<TextView>(R.id.fileSizeTextView)
-
             fileNameTextView.text = fileInfo.name
             fileSizeTextView.text = formatFileSize(fileInfo.size)
 
@@ -332,5 +396,38 @@ class HomeFragment : Fragment() {
         fileListAdapter.clear()
         fileListAdapter.addAll(viewModel.dataSeriesList)
         fileListAdapter.notifyDataSetChanged()
+    }
+
+    private fun updateButtonVisibility() {
+        actionButtonsRecordings.visibility = if (recordingsListView.checkedItemCount > 0) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
+    }
+
+    private fun getSelectedItems(): List<String> {
+        val selectedItems = mutableListOf<String>()
+        val checkedPositions: SparseBooleanArray = recordingsListView.checkedItemPositions
+        for (i in 0 until checkedPositions.size) {
+            if (checkedPositions.valueAt(i)) {
+                val position = checkedPositions.keyAt(i)
+                selectedItems.add(viewModel.dataSeriesList[position].name)
+            }
+        }
+        return selectedItems
+    }
+
+    private fun deleteSelectedItems() {
+        val selectedItems = getSelectedItems()
+        //items.removeAll(selectedItems)
+        fileListAdapter.notifyDataSetChanged()
+        //recordingsListView.clearChoices()
+    }
+
+    private fun clearSelections() {
+        recordingsListView.clearChoices()
+        fileListAdapter.notifyDataSetChanged()
+        updateButtonVisibility()
     }
 }

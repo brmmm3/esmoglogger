@@ -128,16 +128,5 @@ class MainActivity : AppCompatActivity() {
         viewModel.dataSeriesList.addAll(directory.listFiles()?.filter { it.exists() && it.name.startsWith("ESMOG-") && it.extension == "json" }?.map {
             FileInfo(it.name, it.length())
         } ?: emptyList())
-
-        if (directory.exists() && directory.isDirectory) {
-            val files = directory.listFiles()
-            if (files != null) {
-                for (file in files) {
-                    if (file.isFile && file.name.startsWith("ESMOG-") && file.extension == "json") {
-                        viewModel.dataSeriesList.add(FileInfo(file.name, file.length()))
-                    }
-                }
-            }
-        }
     }
 }
