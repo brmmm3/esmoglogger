@@ -11,7 +11,6 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.util.SparseBooleanArray
-import android.view.ActionMode
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -64,7 +63,6 @@ class HomeFragment : Fragment() {
     private lateinit var buttonLoadRecordings: MaterialButton
     private lateinit var buttonDeleteRecordings: MaterialButton
     private lateinit var buttonShareRecordings: MaterialButton
-    private var actionMode: ActionMode? = null
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
@@ -75,7 +73,7 @@ class HomeFragment : Fragment() {
 
     private val jsonViewModel: JsonViewModel by viewModels()
 
-    private var fileNameToSave: String? = null
+    private var filePathToSave: String? = null
     private var dataSeriesToSave: DataSeries? = null
 
     private val handler = Handler(Looper.getMainLooper())
@@ -84,7 +82,7 @@ class HomeFragment : Fragment() {
         if (isGranted) {
             jsonViewModel.saveJsonToStorage(
                 requireContext().contentResolver, requireContext(),
-                fileNameToSave!!, dataSeriesToSave!!
+                filePathToSave!!, dataSeriesToSave!!
             )
         } else {
             Toast.makeText(requireContext(), "Speicherzugriff verweigert", Toast.LENGTH_SHORT).show()
@@ -208,8 +206,6 @@ class HomeFragment : Fragment() {
         recordingsListView.choiceMode = ListView.CHOICE_MODE_MULTIPLE
 
         recordingsListView.setOnItemClickListener { _, _, position, _ ->
-            val text = fileListAdapter.getItem(position) ?: return@setOnItemClickListener
-            println(text)
             recordingsListView.setItemChecked(position, recordingsListView.isItemChecked(position))
             fileListAdapter.notifyDataSetChanged()
             updateButtonVisibility()
@@ -220,6 +216,11 @@ class HomeFragment : Fragment() {
             fileListAdapter.notifyDataSetChanged()
             updateButtonVisibility()
             true
+        }
+
+        viewModel.saved.observe( viewLifecycleOwner) { fileInfo ->
+            fileListAdapter.notifyDataSetChanged()
+            view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
         }
 
         actionButtonsRecordings = root.findViewById<LinearLayout>(R.id.action_buttons_recordings)
@@ -266,6 +267,12 @@ class HomeFragment : Fragment() {
         binding = null
     }
 
+    @SuppressLint("ObsoleteSdkInt")
+    fun getFilePath(fileName: String): String {
+        val sdCard = Environment.getExternalStorageDirectory()
+        return File(sdCard, "${Environment.DIRECTORY_DOCUMENTS}/${fileName}").path
+    }
+
     private fun showConfirmationDialog() {
         AlertDialog.Builder(requireContext())
             .setTitle("Delete recorded data")
@@ -284,19 +291,17 @@ class HomeFragment : Fragment() {
             .show()
     }
 
+    @SuppressLint("ObsoleteSdkInt")
     private fun showTextInputDialog(title: String, hintText: String, command: String, default: String, singleLine: Boolean) {
-        // EditText für die Eingabe erstellen
         val input = EditText(requireContext()).apply {
             hint = hintText
             isSingleLine = singleLine
         }
         input.setText(default)
-        // Dialog mit MaterialAlertDialogBuilder erstellen
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(title)
-            .setView(input) // EditText in den Dialog einfügen
+            .setView(input)
             .setPositiveButton("OK") { _, _ ->
-                // Eingabe verarbeiten
                 val text = input.text.toString().trim()
                 if (text.isNotEmpty()) {
                     when (command) {
@@ -308,23 +313,23 @@ class HomeFragment : Fragment() {
                         }
                         "save" -> {
                             try {
-                                val fileName = "${text}.json"
+                                val filePath = getFilePath("${text}.json")
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || checkStoragePermission()) {
                                     jsonViewModel.saveJsonToStorage(
                                         requireContext().contentResolver, requireContext(),
-                                        fileName, viewModel.dataSeries
+                                        filePath, viewModel.dataSeries
                                     )
                                 } else {
-                                    fileNameToSave = fileName
+                                    filePathToSave = filePath
                                     dataSeriesToSave = viewModel.dataSeries
                                     writeRequestLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                                 }
-                                viewModel.saved(FileInfo(fileName, File(fileName).length()))
-                                updateRecordingsList()
+                                val file = File(filePath)
+                                viewModel.saved(FileInfo(file.name, file.length(), viewModel.dataSeries.hasGps, viewModel.dataSeries.count))
+                                //updateRecordingsList()
                                 buttonSetEnabled(buttonRecord, true)
                                 buttonSetEnabled(buttonDelete, false)
                                 buttonSetEnabled(buttonSave, false)
-                                view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
                             } catch (e: Exception) {
                                 e.printStackTrace()
                                 Toast.makeText(context, "Failed to save: ${e.message}", Toast.LENGTH_LONG).show()
@@ -416,13 +421,6 @@ class HomeFragment : Fragment() {
             }
         }
         return selectedItems
-    }
-
-    private fun deleteSelectedItems() {
-        val selectedItems = getSelectedItems()
-        //items.removeAll(selectedItems)
-        fileListAdapter.notifyDataSetChanged()
-        //recordingsListView.clearChoices()
     }
 
     private fun clearSelections() {

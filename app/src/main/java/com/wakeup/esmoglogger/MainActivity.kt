@@ -15,12 +15,14 @@ import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.NavigationUI.setupActionBarWithNavController
 import androidx.navigation.ui.NavigationUI.setupWithNavController
+import com.wakeup.esmoglogger.data.DataSeries
 import com.wakeup.esmoglogger.databinding.ActivityMainBinding
 import com.wakeup.esmoglogger.serialcommunication.SerialCommunication
 import com.wakeup.esmoglogger.location.LocationHandler
 import com.wakeup.esmoglogger.serialcommunication.SharedSerialData
 import com.wakeup.esmoglogger.ui.log.SharedLogData
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import org.osmdroid.config.Configuration
 import kotlin.getValue
 
@@ -125,8 +127,9 @@ class MainActivity : AppCompatActivity() {
         // Use public Downloads directory (or change to context.getExternalFilesDir(null) for app-specific storage)
         val directory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
 
-        viewModel.dataSeriesList.addAll(directory.listFiles()?.filter { it.exists() && it.name.startsWith("ESMOG-") && it.extension == "json" }?.map {
-            FileInfo(it.name, it.length())
+        viewModel.dataSeriesList.addAll(directory.listFiles()?.filter { file -> file.exists() && file.name.startsWith("ESMOG-") && file.extension == "json" }?.map { file ->
+            val dataSeries = DataSeries.fromJson(JSONObject(file.readText()), false)
+            FileInfo(file.name, file.length(), dataSeries.hasGps, dataSeries.count)
         } ?: emptyList())
     }
 }

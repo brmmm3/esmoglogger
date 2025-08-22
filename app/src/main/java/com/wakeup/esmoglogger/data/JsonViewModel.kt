@@ -14,8 +14,9 @@ import java.io.FileWriter
 class JsonViewModel : ViewModel() {
     @SuppressLint("ObsoleteSdkInt")
     fun saveJsonToStorage(contentResolver: ContentResolver, context: android.content.Context,
-                          fileName: String, dataSeries: DataSeries) {
+                          filePath: String, dataSeries: DataSeries) {
         try {
+            val fileName = File(filePath).name
             val jsonString = dataSeries.toJson().toString()
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -37,8 +38,7 @@ class JsonViewModel : ViewModel() {
                     Toast.makeText(context, "JSON-file saved in Documents/${fileName}", Toast.LENGTH_LONG).show()
                 } ?: throw Exception("Failed to save file")
             } else {
-                val sdCard = Environment.getExternalStorageDirectory()
-                val file = File(sdCard, "${Environment.DIRECTORY_DOCUMENTS}/${fileName}")
+                val file = File(filePath)
                 file.parentFile?.mkdirs()
                 FileWriter(file).use { writer ->
                     writer.write(jsonString)

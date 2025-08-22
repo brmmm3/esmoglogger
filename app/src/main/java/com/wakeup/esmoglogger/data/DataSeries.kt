@@ -26,7 +26,10 @@ class DataSeries {
     var version: Int = 0
     // Device name
     var device = ""
+    var hasGps = false
     var data: CopyOnWriteArrayList<ESmogAndLocation> = CopyOnWriteArrayList()
+    var compressedHex: String? = null
+    var count: Int = 0
     // Data series notes
     var seriesNotes = ""
     // Filename. If empty dataseries is not saved
@@ -39,15 +42,22 @@ class DataSeries {
     fun start() {
         data = CopyOnWriteArrayList()
         startTime = LocalDateTime.now()
+        hasGps = false
     }
 
     fun add(value: ESmogAndLocation) {
         data.add(value)
+        if (!hasGps && (value.latitude != 0.0 || value.longitude != 0.0 || value.altitude != 0.0)) {
+            hasGps = true
+        }
     }
 
     fun add(time: Float, level: Float, frequency: Int,
             latitude: Double, longitude: Double, altitude: Double) {
         data.add(ESmogAndLocation(time, level, frequency, latitude, longitude, altitude))
+        if (!hasGps && (latitude != 0.0 || longitude != 0.0 || altitude != 0.0)) {
+            hasGps = true
+        }
     }
 
     fun stop(name: String) {
@@ -66,45 +76,44 @@ class DataSeries {
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         jsonObject.put("start", startTime.format(formatter))
         jsonObject.put("count", data.size)
+        jsonObject.put("has_gps", hasGps)
         if (!seriesNotes.isEmpty()) {
             jsonObject.put("notes", seriesNotes)
         }
-        if (!data.isEmpty()) {
-            val jsonData = JSONArray().apply {
-                data.forEach { value ->
-                    put(JSONArray().apply {
-                        put(value.time)
-                        put(value.level)
-                        put(value.frequency)
-                        put(value.latitude)
-                        put(value.longitude)
-                        put(value.altitude)
-                    })
-                }
-            }
-            val compressedData = JsonCompressor.compressJson(jsonData)
-            if (compressedData != null) {
-                Log.d("DataSeries", "Compressed size: ${compressedData.size} bytes")
-                jsonObject.put("data",compressedData.toString())
-            } else {
-                Log.e("DataSeries", "Failed to compress JSON")
-            }
+        compressData()
+        if (compressedHex != null) {
+            Log.d("DataSeries", "Compressed size: ${compressedHex!!.length} bytes")
+            jsonObject.put("data",compressedHex)
+        } else {
+            Log.e("DataSeries", "Failed to compress JSON")
         }
         return jsonObject
     }
 
-    fun fromJson(jsonObject: JSONObject) {
-        name = jsonObject.optString("name")
-        version = jsonObject.getInt("version")
-        device = jsonObject.optString("device")
-        startTime = jsonObject.get("start") as LocalDateTime
-        seriesNotes = jsonObject.optString("notes")
-        try {
-            val jsonArray = JsonCompressor.decompressJson(jsonObject.optString("data").encodeToByteArray()) ?: JSONArray()
-            val newData: CopyOnWriteArrayList<ESmogAndLocation> = CopyOnWriteArrayList()
+    companion object {
+        fun fromJson(jsonObject: JSONObject, decompress: Boolean): DataSeries {
+            val dataSeries = DataSeries()
+            dataSeries.name = jsonObject.optString("name")
+            dataSeries.version = jsonObject.getInt("version")
+            dataSeries.device = jsonObject.optString("device")
+            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+            dataSeries.startTime = LocalDateTime.parse(jsonObject.get("start") as CharSequence?, formatter)
+            dataSeries.seriesNotes = jsonObject.optString("notes")
+            dataSeries.hasGps = jsonObject.getBoolean("has_gps")
+            dataSeries.compressedHex = jsonObject.optString("data")
+            dataSeries.count = jsonObject.getInt("count")
+            if (decompress && dataSeries.compressedHex != null) {
+                dataSeries.data = CopyOnWriteArrayList(decompressData(dataSeries.compressedHex!!))
+            }
+            return dataSeries
+        }
+
+        fun decompressData(compressedHex: String): ArrayList<ESmogAndLocation> {
+            val jsonArray = JsonCompressor.decompressJson(compressedHex) ?: JSONArray()
+            val data: ArrayList<ESmogAndLocation> = ArrayList()
             for (i in 0 until jsonArray.length()) {
                 val jsonObject = jsonArray.getJSONArray(i) ?: continue
-                newData.add(ESmogAndLocation(
+                data.add(ESmogAndLocation(
                     jsonObject.get(0) as Float,
                     jsonObject.get(1) as Float,
                     jsonObject.get(2) as Int,
@@ -113,10 +122,24 @@ class DataSeries {
                     jsonObject.get(5) as Double
                 ))
             }
-            data = newData
-        } catch (e: Exception) {
-            Log.e("DataSeries", "Failed to parse JSONArray: ${e.message}", e)
-            null
+            return data
         }
+    }
+
+    fun compressData() {
+        count = data.size
+        val jsonData = JSONArray().apply {
+            data.forEach { value ->
+                put(JSONArray().apply {
+                    put(value.time)
+                    put(value.level)
+                    put(value.frequency)
+                    put(value.latitude)
+                    put(value.longitude)
+                    put(value.altitude)
+                })
+            }
+        }
+        compressedHex = JsonCompressor.compressJson(jsonData)
     }
 }

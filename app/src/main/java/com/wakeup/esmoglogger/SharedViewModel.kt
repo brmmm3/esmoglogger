@@ -23,6 +23,9 @@ class SharedViewModel: ViewModel() {
     // Enable/Disable ESmog (and GPS) recording
     private val _recording = MutableLiveData<Boolean>()
     val recording: LiveData<Boolean> get() = _recording
+    // Dataseries has been saved to file
+    private val _saved = MutableLiveData<FileInfo>()
+    val saved: LiveData<FileInfo> get() = _saved
     // Location and ESmog queue
     private val _locationAndESmogQueue = MutableSharedFlow<ESmogAndLocation>(
         replay = 0, // No replay for new subscribers
@@ -108,5 +111,6 @@ class SharedViewModel: ViewModel() {
     fun saved(fileInfo: FileInfo) {
         dataSeries.filename = fileInfo.name
         dataSeriesList.add(fileInfo)
+        _saved.postValue(fileInfo)
     }
 }

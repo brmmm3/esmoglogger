@@ -1,35 +1,54 @@
 package com.wakeup.esmoglogger.data
 
 import android.util.Log
-import org.json.JSONObject
-import com.github.luben.zstd.Zstd
 import org.json.JSONArray
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
+
+fun ByteArray.toHex(): String = joinToString("") { it.toUByte().toString(16).padStart(2, '0') }
+
+fun String.hexToByteArray(): ByteArray = chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 
 object JsonCompressor {
     private const val TAG = "JsonCompressor"
 
-    // Compress a JSONObject using Zstandard
-    fun compressJson(jsonObject: JSONArray): ByteArray? {
+    fun compressJson(jsonObject: JSONArray): String? {
         return try {
-            // Convert JSONObject to String, then to ByteArray
             val jsonString = jsonObject.toString()
             val inputBytes = jsonString.toByteArray(StandardCharsets.UTF_8)
 
-            // Compress using Zstd with default compression level (3)
-            val compressedBytes = Zstd.compress(inputBytes)
-            compressedBytes
+            ByteArrayOutputStream().use { baos ->
+                ZipOutputStream(baos).use { zos ->
+                    val entry = ZipEntry("data.json")
+                    zos.putNextEntry(entry)
+                    zos.write(inputBytes)
+                    zos.closeEntry()
+                    zos.finish()
+                }
+                Log.d(TAG, "Compressed JSONArray to ByteArray")
+                baos.toByteArray().toHex()
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Compression failed: ${e.message}", e)
             null
         }
     }
 
-    // Decompress a ByteArray back to a JSONObject
-    fun decompressJson(compressedBytes: ByteArray): JSONArray? {
+    // Decompress a HEX string back to a JSONObject
+    fun decompressJson(hex: String): JSONArray? {
         return try {
-            // Decompress the bytes using Zstd
-            val decompressedBytes = Zstd.decompress(compressedBytes, estimateOriginalSize(compressedBytes))
+            val compressedBytes = hex.hexToByteArray()
+            val decompressedBytes = ByteArrayInputStream(compressedBytes).use { bais ->
+                ZipInputStream(bais).use { zis ->
+                    zis.nextEntry?.let {
+                        zis.readBytes()
+                    } ?: throw IllegalStateException("No entries in ZIP")
+                }
+            }
             val jsonString = String(decompressedBytes, StandardCharsets.UTF_8)
 
             // Convert back to JSONObject
@@ -38,12 +57,5 @@ object JsonCompressor {
             Log.e(TAG, "Decompression failed: ${e.message}", e)
             null
         }
-    }
-
-    // Estimate the original size for decompression (Zstd requires a size hint)
-    private fun estimateOriginalSize(compressedBytes: ByteArray): Int {
-        // Zstd requires the decompressed size to be known or estimated.
-        // A safe estimate is 10x the compressed size, but adjust based on your data.
-        return compressedBytes.size * 10
     }
 }

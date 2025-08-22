@@ -5,7 +5,7 @@ import android.graphics.PorterDuff
 import android.os.Build
 import com.google.android.material.button.MaterialButton
 
-data class FileInfo(val name: String, val size: Long)
+data class FileInfo(val name: String, val size: Long, val hasGps: Boolean, val count: Int)
 
 fun buttonSetEnabled(button: MaterialButton?, enabled: Boolean) {
     button?.isEnabled = enabled
