@@ -3,10 +3,12 @@ package com.wakeup.esmoglogger.ui.chartview
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import androidx.core.graphics.alpha
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.renderer.LineChartRenderer
 import com.github.mikephil.charting.utils.Transformer
 import com.github.mikephil.charting.utils.ViewPortHandler
+import com.wakeup.esmoglogger.levelColors
 
 class CustomLineChartRenderer(
     chart: LineChart,
@@ -32,24 +34,22 @@ class CustomLineChartRenderer(
     override fun drawExtras(c: Canvas) {
         super.drawExtras(c)
 
-        // Y-Bereiche in Pixel umrechnen
+        fun getColorWithAlpha(color: Int, alpha: Int): Int {
+            return Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
+        }
+
         val transformer: Transformer = mChart.getTransformer(com.github.mikephil.charting.components.YAxis.AxisDependency.LEFT)
-
-        // Pixel-Koordinaten für die Y-Bereiche berechnen
-        val zeroLine = transformer.getPixelForValues(0f, 0f).y.toFloat()
-        val greenArea = transformer.getPixelForValues(0f, 0.18f).y.toFloat()
-        val yellowArea = transformer.getPixelForValues(0f, 5.8f).y.toFloat()
-        val redArea = transformer.getPixelForValues(0f, 180f).y.toFloat()
-
-        // Rechtecke für die Hintergrundbereiche zeichnen
         val viewPort = mViewPortHandler.contentRect
-        // Grüner Bereich (Y: 0–0.18)
-        c.drawRect(viewPort.left, greenArea, viewPort.right, zeroLine, greenPaint)
-        // Gelber Bereich (Y: 0.18–5.8)
-        c.drawRect(viewPort.left, yellowArea, viewPort.right, greenArea, yellowPaint
-        )
-        // Roter Bereich (Y: 5.8-200)
-        c.drawRect(viewPort.left, redArea,viewPort.right, yellowArea, redPaint
-        )
+        var oldLevelColor = levelColors.firstOrNull()
+        for (levelColor in levelColors.drop(1)) {
+            val oldArea = transformer.getPixelForValues(0f, oldLevelColor!!.first.toFloat()).y.toFloat()
+            val area = transformer.getPixelForValues(0f, levelColor.first.toFloat()).y.toFloat()
+            val paint = Paint().apply {
+                color = getColorWithAlpha(levelColor.second, 30)
+                style = Paint.Style.FILL
+            }
+            c.drawRect(viewPort.left, area, viewPort.right, oldArea, paint)
+            oldLevelColor = levelColor
+        }
     }
 }

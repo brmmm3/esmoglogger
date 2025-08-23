@@ -16,7 +16,7 @@ data class GpsLocation(val time: Float,
 
 data class ESmogAndLocation(val time: Float,
                             val level: Float, val frequency: Int,
-                            val latitude: Double, val longitude: Double, val altitude: Double)
+                            var latitude: Double, var longitude: Double, var altitude: Double)
 
 class DataSeries {
     var startTime: LocalDateTime = LocalDateTime.now()

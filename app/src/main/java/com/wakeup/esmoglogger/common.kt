@@ -3,9 +3,35 @@ package com.wakeup.esmoglogger
 import android.graphics.Color
 import android.graphics.PorterDuff
 import android.os.Build
+import androidx.core.graphics.toColorInt
 import com.google.android.material.button.MaterialButton
 
 data class FileInfo(val name: String, val size: Long, val hasGps: Boolean, val count: Int)
+
+val levelColors = arrayListOf(
+    Pair(0.0, Color.GRAY),
+    Pair(0.06, "#007F00".toColorInt()),
+    Pair(0.18, Color.GREEN),
+    Pair(0.28, "#7FFF00".toColorInt()),
+    Pair(1.0, "#AFFF00".toColorInt()),
+    Pair(2.0, "#BFFF00".toColorInt()),
+    Pair(3.0, "#CFFF00".toColorInt()),
+    Pair(4.0, "#DFFF00".toColorInt()),
+    Pair(5.8, Color.YELLOW),
+    Pair(8.0, "#FF7F00".toColorInt()),
+    Pair(9.0, "#FF5F00".toColorInt()),
+    Pair(10.0, "#FF3F00".toColorInt()),
+    Pair(15.0, Color.RED),
+    Pair(180.0, Color.RED))
+
+fun getLevelColor(level: Float): Int {
+    for (levelColor in levelColors) {
+        if (level <= levelColor.first) {
+            return levelColor.second
+        }
+    }
+    return Color.RED
+}
 
 fun buttonSetEnabled(button: MaterialButton?, enabled: Boolean) {
     button?.isEnabled = enabled

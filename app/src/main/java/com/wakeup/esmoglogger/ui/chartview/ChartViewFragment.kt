@@ -15,6 +15,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.github.mikephil.charting.charts.LineChart
 import com.wakeup.esmoglogger.R
 import com.wakeup.esmoglogger.SharedViewModel
+import com.wakeup.esmoglogger.data.ESmog
 import kotlinx.coroutines.launch
 import kotlin.getValue
 
@@ -48,7 +49,7 @@ class ChartViewFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.locationAndESmogQueue.collect { value ->
+                viewModel.esmogQueue.collect { value ->
                     chartManager?.addChartPt(value.time, value.level, value.frequency)
                     chartManager2?.addChartPt(value.time, value.level, value.frequency)
                 }
@@ -85,7 +86,7 @@ class ChartViewFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         Thread {
             viewModel.dataSeries.data.forEach { value ->
-                viewModel.enqueueLocationAndESmog(value)
+                viewModel.enqueueESmog(ESmog(value.time, value.level, value.frequency))
             }
         }.start()
     }

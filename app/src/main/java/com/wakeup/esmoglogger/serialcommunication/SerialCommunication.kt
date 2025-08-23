@@ -112,7 +112,7 @@ class SerialCommunication(private val context: Context?) {
                     break
                 }
                 try {
-                    SharedSerialData.addESmog(Random.nextInt(20000).toFloat() / 100f, Random.nextInt(5000))
+                    SharedSerialData.addESmog(Random.nextInt(1500).toFloat() / 100f, Random.nextInt(5000))
                     Thread.sleep(500)
                 } catch (e: Exception) {
                     SharedLogData.addLog("Read error: ${e.message}")

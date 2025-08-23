@@ -130,12 +130,8 @@ class HomeFragment : Fragment() {
                 viewModel.stopGps()
             }
         }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.locationAndESmogQueue.collect { value ->
-                    root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=${value.latitude}\nLng=${value.longitude}\nAlt=${value.altitude}"
-                }
-            }
+        viewModel.location.observe(viewLifecycleOwner) { value ->
+            root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=${value.latitude}\nLng=${value.longitude}\nAlt=${value.altitude}"
         }
         val value = viewModel.location.value
         value?.let { root.findViewById<TextView>(R.id.textview_gps_location)?.text = "Lat=${it.latitude}\nLng=${value.longitude}\nAlt=${value.altitude}" }
@@ -148,6 +144,8 @@ class HomeFragment : Fragment() {
         buttonSetEnabled(buttonSave, false)
 
         if (viewModel.recording.value == true) {
+            val dt = Duration.between(startTime, LocalDateTime.now())
+            view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "${dt.toMillis() / 1000} s"
             buttonRecord.setIconResource(R.drawable.stop_32p)
         } else {
             buttonRecord.setIconResource(R.drawable.record_32p)

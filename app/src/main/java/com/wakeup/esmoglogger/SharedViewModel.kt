@@ -27,17 +27,24 @@ class SharedViewModel: ViewModel() {
     private val _saved = MutableLiveData<FileInfo>()
     val saved: LiveData<FileInfo> get() = _saved
     // Location and ESmog queue
-    private val _locationAndESmogQueue = MutableSharedFlow<ESmogAndLocation>(
+    private val _mapViewDataQueue = MutableSharedFlow<ESmogAndLocation>(
         replay = 0, // No replay for new subscribers
         extraBufferCapacity = 1000, // Large buffer to handle high-frequency data
         onBufferOverflow = BufferOverflow.SUSPEND // Suspend emitter if buffer is full
     )
-    val locationAndESmogQueue = _locationAndESmogQueue.asSharedFlow()
+    val mapViewDataQueue = _mapViewDataQueue.asSharedFlow()
     // MAP view
     var mapViewZoom = 18.0
     // Latest values
+    private val _esmogQueue = MutableSharedFlow<ESmog>(
+        replay = 0, // No replay for new subscribers
+        extraBufferCapacity = 1000, // Large buffer to handle high-frequency data
+        onBufferOverflow = BufferOverflow.SUSPEND // Suspend emitter if buffer is full
+    )
+    val esmogQueue = _esmogQueue.asSharedFlow()
     private val _esmog = MutableLiveData<ESmog>()
     val esmog: LiveData<ESmog> get() = _esmog
+    private var lastESmogPos = 0
     private val _location = MutableLiveData<GpsLocation>()
     val location: LiveData<GpsLocation> get() = _location
     // DataSeries
@@ -53,6 +60,7 @@ class SharedViewModel: ViewModel() {
     }
 
     fun startRecording() {
+        lastESmogPos = 0
         dataSeries.clear()
         dataSeries.start()
         _recording.value = true
@@ -68,39 +76,76 @@ class SharedViewModel: ViewModel() {
         dataSeries.clear()
     }
 
+    fun enqueueESmog(value: ESmog) {
+        viewModelScope.launch {
+            _esmogQueue.emit(value)
+        }
+    }
+
     fun enqueueLocationAndESmog(value: ESmogAndLocation) {
         viewModelScope.launch {
-            _locationAndESmogQueue.emit(value)
+            _mapViewDataQueue.emit(value)
         }
     }
 
     fun addESmog(level: Float, frequency: Int) {
         val dt = Duration.between(dataSeries.startTime, LocalDateTime.now()).toMillis().toFloat() / 1000f
         val gpsLocation: GpsLocation = location.value ?: GpsLocation(0f, 0.0, 0.0, 0.0)
-        val value = ESmogAndLocation(dt, level, frequency, gpsLocation.latitude, gpsLocation.longitude, gpsLocation.altitude)
-        _esmog.postValue(ESmog(dt, level, frequency))
+        val value = ESmog(dt, level, frequency)
+        _esmog.postValue(value)
         viewModelScope.launch {
-            _locationAndESmogQueue.emit(value)
+            _esmogQueue.emit(value)
         }
         if (recording.value == true) {
-            dataSeries.add(value)
+            dataSeries.add(ESmogAndLocation(dt, level, frequency, gpsLocation.latitude, gpsLocation.longitude, gpsLocation.altitude))
         }
     }
 
     fun addLocation(location: Location) {
         val dt = Duration.between(dataSeries.startTime, LocalDateTime.now()).toMillis().toFloat() / 1000f
-        val esmog: ESmog = if (recording.value == true) {
-            esmog.value ?: ESmog(0f, 0f, 0)
-        } else {
-            ESmog(0f, 0f, 0)
-        }
-        val value = ESmogAndLocation(dt, esmog.level, esmog.frequency, location.latitude, location.longitude, location.altitude)
         _location.postValue(GpsLocation(dt, location.latitude, location.longitude, location.altitude))
         viewModelScope.launch {
-            _locationAndESmogQueue.emit(value)
-        }
-        if (recording.value == true) {
-            dataSeries.add(value)
+            var cnt = dataSeries.data.size - lastESmogPos
+            if (cnt > 0) {
+                println("GPS ${dataSeries.data.size} $cnt (${location.latitude} ${location.longitude} ${location.altitude})")
+                val refValue = dataSeries.data[lastESmogPos]!!.copy()
+                _mapViewDataQueue.emit(refValue)
+                val dLatitude = (location.latitude - refValue.latitude) / cnt
+                val dLongitude = (location.longitude - refValue.longitude) / cnt
+                val dAltitude = (location.altitude - refValue.altitude) / cnt
+                println("# $lastESmogPos: $refValue")
+                var pos = 0
+                while (cnt > 2) {
+                    pos++
+                    cnt--
+                    lastESmogPos++
+                    val value = dataSeries.data[lastESmogPos]!!
+                    value.latitude = refValue.latitude + dLatitude * pos
+                    value.longitude = refValue.longitude + dLongitude * pos
+                    value.altitude = refValue.altitude + dAltitude * pos
+                    dataSeries.data[lastESmogPos] = value
+                    println("*$pos $cnt $lastESmogPos: $value")
+                    _mapViewDataQueue.emit(value)
+                }
+                lastESmogPos++
+                if (lastESmogPos < dataSeries.data.size) {
+                    val value = dataSeries.data[lastESmogPos]!!
+                    value.latitude = location.latitude
+                    value.longitude = location.longitude
+                    value.altitude = location.altitude
+                    dataSeries.data[lastESmogPos] = value
+                    println("= $lastESmogPos: $value")
+                    _mapViewDataQueue.emit(value)
+                }
+            } else {
+                val esmog: ESmog = if (recording.value == true) {
+                    esmog.value ?: ESmog(0f, 0f, 0)
+                } else {
+                    ESmog(0f, 0f, 0)
+                }
+                val value = ESmogAndLocation(dt, esmog.level, esmog.frequency, location.latitude, location.longitude, location.altitude)
+                _mapViewDataQueue.emit(value)
+            }
         }
     }
 
