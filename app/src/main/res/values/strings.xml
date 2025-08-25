@@ -21,6 +21,11 @@
     <string name="dark_theme">Dark Theme</string>
     <string name="delete">Delete</string>
     <string name="share">Share</string>
+    <string name="filename">Filename</string>
+    <string name="file_size">File size</string>
+    <string name="gps">GPS</string>
+    <string name="count">Count</string>
+    <string name="loaded">Ld</string>
     <string-array name="chart_view_options">
         <item>Lvl</item>
         <item>Frq</item>

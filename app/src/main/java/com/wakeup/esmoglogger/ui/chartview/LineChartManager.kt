@@ -10,7 +10,7 @@ import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.formatter.ValueFormatter
-import com.wakeup.esmoglogger.data.DataSeries
+import com.wakeup.esmoglogger.data.Recording
 
 class LineChartManager(lineChart: LineChart, customRenderer: Boolean) {
     private val chart: LineChart = lineChart
@@ -171,7 +171,7 @@ class LineChartManager(lineChart: LineChart, customRenderer: Boolean) {
         frqDataSet.clear()
     }
 
-    fun set(data: DataSeries) {
+    fun set(data: Recording) {
         lvlDataSet.clear()
         frqDataSet.clear()
         // TODO

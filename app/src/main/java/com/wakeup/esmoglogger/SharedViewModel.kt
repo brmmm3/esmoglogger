@@ -5,16 +5,18 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.wakeup.esmoglogger.data.DataSeries
+import com.wakeup.esmoglogger.data.Recording
 import com.wakeup.esmoglogger.data.ESmog
 import com.wakeup.esmoglogger.data.ESmogAndLocation
 import com.wakeup.esmoglogger.data.GpsLocation
+import com.wakeup.esmoglogger.ui.mapview.MapViewData
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.LocalDateTime
+import kotlin.math.max
 
 class SharedViewModel: ViewModel() {
     // Enable/Disable GPS
@@ -27,7 +29,7 @@ class SharedViewModel: ViewModel() {
     private val _saved = MutableLiveData<FileInfo>()
     val saved: LiveData<FileInfo> get() = _saved
     // Location and ESmog queue
-    private val _mapViewDataQueue = MutableSharedFlow<ESmogAndLocation>(
+    private val _mapViewDataQueue = MutableSharedFlow<MapViewData>(
         replay = 0, // No replay for new subscribers
         extraBufferCapacity = 1000, // Large buffer to handle high-frequency data
         onBufferOverflow = BufferOverflow.SUSPEND // Suspend emitter if buffer is full
@@ -48,8 +50,8 @@ class SharedViewModel: ViewModel() {
     private val _location = MutableLiveData<GpsLocation>()
     val location: LiveData<GpsLocation> get() = _location
     // DataSeries
-    val dataSeriesList: MutableList<FileInfo> = mutableListOf()
-    var dataSeries = DataSeries()
+    val recordings: MutableList<Recording> = mutableListOf()
+    var dataSeries = Recording()
 
     fun startGps() {
         _gps.value = true
@@ -60,8 +62,7 @@ class SharedViewModel: ViewModel() {
     }
 
     fun startRecording() {
-        lastESmogPos = 0
-        dataSeries.clear()
+        clear()
         dataSeries.start()
         _recording.value = true
     }
@@ -73,7 +74,8 @@ class SharedViewModel: ViewModel() {
 
     fun clear() {
         mapViewZoom = 18.0
-        dataSeries.clear()
+        lastESmogPos = 0
+        dataSeries = Recording()
     }
 
     fun enqueueESmog(value: ESmog) {
@@ -84,7 +86,7 @@ class SharedViewModel: ViewModel() {
 
     fun enqueueLocationAndESmog(value: ESmogAndLocation) {
         viewModelScope.launch {
-            _mapViewDataQueue.emit(value)
+            _mapViewDataQueue.emit(MapViewData(value, false))
         }
     }
 
@@ -109,11 +111,13 @@ class SharedViewModel: ViewModel() {
             if (cnt > 0) {
                 println("GPS ${dataSeries.data.size} $cnt (${location.latitude} ${location.longitude} ${location.altitude})")
                 val refValue = dataSeries.data[lastESmogPos]!!.copy()
-                _mapViewDataQueue.emit(refValue)
+                _mapViewDataQueue.emit(MapViewData(refValue, false))
                 val dLatitude = (location.latitude - refValue.latitude) / cnt
                 val dLongitude = (location.longitude - refValue.longitude) / cnt
                 val dAltitude = (location.altitude - refValue.altitude) / cnt
+                val moving = dLatitude != 0.0 || dLongitude != 0.0 || dAltitude != 0.0
                 println("# $lastESmogPos: $refValue")
+                var maxLevel = refValue.level
                 var pos = 0
                 while (cnt > 2) {
                     pos++
@@ -124,18 +128,26 @@ class SharedViewModel: ViewModel() {
                     value.longitude = refValue.longitude + dLongitude * pos
                     value.altitude = refValue.altitude + dAltitude * pos
                     dataSeries.data[lastESmogPos] = value
-                    println("*$pos $cnt $lastESmogPos: $value")
-                    _mapViewDataQueue.emit(value)
+                    if (moving) {
+                        println("*$pos $cnt $lastESmogPos: $value")
+                        _mapViewDataQueue.emit(MapViewData(value, false))
+                    } else {
+                        maxLevel = max(value.level, maxLevel)
+                    }
                 }
                 lastESmogPos++
                 if (lastESmogPos < dataSeries.data.size) {
-                    val value = dataSeries.data[lastESmogPos]!!
+                    var value = dataSeries.data[lastESmogPos]!!
                     value.latitude = location.latitude
                     value.longitude = location.longitude
                     value.altitude = location.altitude
                     dataSeries.data[lastESmogPos] = value
                     println("= $lastESmogPos: $value")
-                    _mapViewDataQueue.emit(value)
+                    if (!moving) {
+                        value = value.copy()
+                        value.level = max(value.level, maxLevel)
+                    }
+                    _mapViewDataQueue.emit(MapViewData(value, false))
                 }
             } else {
                 val esmog: ESmog = if (recording.value == true) {
@@ -144,7 +156,7 @@ class SharedViewModel: ViewModel() {
                     ESmog(0f, 0f, 0)
                 }
                 val value = ESmogAndLocation(dt, esmog.level, esmog.frequency, location.latitude, location.longitude, location.altitude)
-                _mapViewDataQueue.emit(value)
+                _mapViewDataQueue.emit(MapViewData(value, false))
             }
         }
     }
@@ -154,8 +166,9 @@ class SharedViewModel: ViewModel() {
     }
 
     fun saved(fileInfo: FileInfo) {
-        dataSeries.filename = fileInfo.name
-        dataSeriesList.add(fileInfo)
+        dataSeries.fileName = fileInfo.name
+        dataSeries.fileSize = fileInfo.size
+        recordings.add(dataSeries)
         _saved.postValue(fileInfo)
     }
 }

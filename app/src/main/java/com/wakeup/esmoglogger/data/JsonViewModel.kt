@@ -14,10 +14,10 @@ import java.io.FileWriter
 class JsonViewModel : ViewModel() {
     @SuppressLint("ObsoleteSdkInt")
     fun saveJsonToStorage(contentResolver: ContentResolver, context: android.content.Context,
-                          filePath: String, dataSeries: DataSeries) {
+                          filePath: String, recording: Recording) {
         try {
             val fileName = File(filePath).name
-            val jsonString = dataSeries.toJson().toString()
+            val jsonString = recording.toJson().toString()
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val contentValues = ContentValues().apply {
@@ -45,6 +45,7 @@ class JsonViewModel : ViewModel() {
                 }
                 Toast.makeText(context, "JSON-file saved: ${file.absolutePath}", Toast.LENGTH_LONG).show()
             }
+            recording.setSaved(fileName, File(filePath).length())
         } catch (e: Exception) {
             e.printStackTrace()
             Toast.makeText(context, "Failed to save: ${e.message}", Toast.LENGTH_LONG).show()

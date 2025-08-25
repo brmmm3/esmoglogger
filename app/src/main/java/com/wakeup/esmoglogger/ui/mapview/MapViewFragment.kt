@@ -19,14 +19,13 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
-import androidx.core.graphics.toColorInt
 import com.wakeup.esmoglogger.getLevelColor
 
+data class MapViewData(val value: ESmogAndLocation, val new: Boolean)
 
 class MapViewFragment : Fragment() {
     private val viewModel: SharedViewModel by activityViewModels()
     private lateinit var mapView: MapView
-    private val values = arrayListOf<ESmogAndLocation>()
     private val pathSegments = mutableListOf<Polyline>()
     private lateinit var currentLocationMarker: Marker
 
@@ -65,15 +64,14 @@ class MapViewFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.mapViewDataQueue.collect { value ->
-                    values.add(value)
-                    val geoPoint = GeoPoint(value.latitude, value.longitude)
-                    val color = if (value.frequency == 0) {
+                viewModel.mapViewDataQueue.collect { data ->
+                    val geoPoint = GeoPoint(data.value.latitude, data.value.longitude)
+                    val color = if (data.value.frequency == 0) {
                         Color.GRAY
                     } else {
-                        getLevelColor(value.level)
+                        getLevelColor(data.value.level)
                     }
-                    if (pathSegments.isEmpty() || pathSegments.last().color != color) {
+                    if (data.new || pathSegments.isEmpty() || pathSegments.last().color != color) {
                         val newPath = Polyline()
                         newPath.color = color
                         newPath.width = 8f

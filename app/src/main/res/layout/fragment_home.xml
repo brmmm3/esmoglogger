@@ -136,51 +136,70 @@
         android:textSize="22sp"
         android:text="@string/recordings_title" />
 
-    <ListView
-        android:id="@+id/recordings_list_view"
+    <HorizontalScrollView
+        android:id="@+id/recordings_scroll_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:divider="@android:color/darker_gray"
-        android:dividerHeight="1dp" />
+        android:scrollbars="horizontal"
+        android:scrollbarStyle="outsideOverlay"
+        android:fadeScrollbars="false">
+
+        <ListView
+            android:id="@+id/recordings_list_view"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:scrollbars="vertical|horizontal"
+            android:minWidth="600dp"
+            android:divider="@android:color/darker_gray"
+            android:dividerHeight="1dp" />
+
+    </HorizontalScrollView>
 
     <LinearLayout
         android:id="@+id/action_buttons_recordings"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="8dp"
-        android:visibility="gone">
+        android:visibility="gone"
+        android:padding="8dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/button_load_recordings"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:layout_height="54dp"
             android:layout_marginEnd="8dp"
-            android:text="@string/delete"
-            android:drawableStart="@android:drawable/ic_menu_delete"
-            android:padding="8dp" />
+            android:layout_gravity="center"
+            app:iconGravity="textStart"
+            app:iconTint="#FF0000"
+            android:drawableTop="@drawable/import_32p" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/button_delete_recordings"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:layout_height="54dp"
             android:layout_marginEnd="8dp"
-            android:text="@string/delete"
-            android:drawableStart="@android:drawable/ic_menu_delete"
-            android:padding="8dp" />
+            app:icon="@drawable/button_delete"
+            app:iconGravity="textStart"
+            app:iconTint="@null" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/button_share_recordings"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="@string/share"
-            android:drawableStart="@android:drawable/ic_menu_share"
-            android:padding="8dp" />
+            android:layout_width="wrap_content"
+            android:layout_height="54dp"
+            android:layout_marginEnd="8dp"
+            app:icon="@drawable/button_share"
+            app:iconGravity="textStart"
+            app:iconTint="@null" />
 
     </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:textSize="22sp"
+        android:text="" />
 
 </LinearLayout>

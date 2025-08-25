@@ -16,6 +16,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
@@ -25,9 +26,6 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -39,11 +37,10 @@ import com.wakeup.esmoglogger.buttonSetEnabled
 import com.wakeup.esmoglogger.FileInfo
 import com.wakeup.esmoglogger.R
 import com.wakeup.esmoglogger.SharedViewModel
-import com.wakeup.esmoglogger.data.DataSeries
+import com.wakeup.esmoglogger.data.Recording
 import com.wakeup.esmoglogger.data.JsonViewModel
 import com.wakeup.esmoglogger.databinding.FragmentHomeBinding
 import com.wakeup.esmoglogger.serialcommunication.SharedSerialData
-import kotlinx.coroutines.launch
 import java.io.File
 import java.text.DecimalFormat
 import java.time.Duration
@@ -74,7 +71,7 @@ class HomeFragment : Fragment() {
     private val jsonViewModel: JsonViewModel by viewModels()
 
     private var filePathToSave: String? = null
-    private var dataSeriesToSave: DataSeries? = null
+    private var recordingToSave: Recording? = null
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -82,7 +79,7 @@ class HomeFragment : Fragment() {
         if (isGranted) {
             jsonViewModel.saveJsonToStorage(
                 requireContext().contentResolver, requireContext(),
-                filePathToSave!!, dataSeriesToSave!!
+                filePathToSave!!, recordingToSave!!
             )
         } else {
             Toast.makeText(requireContext(), "Speicherzugriff verweigert", Toast.LENGTH_SHORT).show()
@@ -197,11 +194,14 @@ class HomeFragment : Fragment() {
 
         fileListAdapter = FileListAdapter(
             requireContext(),
-            recordingsListView,
-            viewModel.dataSeriesList
+            viewModel.recordings
         )
         recordingsListView.adapter = fileListAdapter
         recordingsListView.choiceMode = ListView.CHOICE_MODE_MULTIPLE
+        recordingsListView.isHorizontalScrollBarEnabled = true
+
+        val headerView = layoutInflater.inflate(R.layout.list_header_file, recordingsListView, false)
+        recordingsListView.addHeaderView(headerView)
 
         recordingsListView.setOnItemClickListener { _, _, position, _ ->
             recordingsListView.setItemChecked(position, recordingsListView.isItemChecked(position))
@@ -226,18 +226,20 @@ class HomeFragment : Fragment() {
         buttonDeleteRecordings = root.findViewById<MaterialButton>(R.id.button_delete_recordings)
         buttonShareRecordings = root.findViewById<MaterialButton>(R.id.button_share_recordings)
 
-        buttonLoadRecordings.setOnClickListener {  }
+        buttonLoadRecordings.setOnClickListener {
+
+        }
 
         buttonDeleteRecordings.setOnClickListener {
             val selectedItems = getSelectedItems()
             val fileIndex = HashMap<String, Int>()
-            viewModel.dataSeriesList.forEachIndexed { index, fileInfo ->
-                fileIndex.put(fileInfo.name, index)
+            viewModel.recordings.forEachIndexed { index, dataSeries ->
+                fileIndex.put(dataSeries.fileName, index)
             }
             val sdCard = Environment.getExternalStorageDirectory()
-            selectedItems.reversed().forEach { name ->
-                if (File(sdCard, "${Environment.DIRECTORY_DOCUMENTS}/${name}").delete()) {
-                    fileIndex.get(name)?.let { index -> viewModel.dataSeriesList.removeAt(index) }
+            selectedItems.reversed().forEach { filename ->
+                if (File(sdCard, "${Environment.DIRECTORY_DOCUMENTS}/${filename}").delete()) {
+                    fileIndex.get(filename)?.let { index -> viewModel.recordings.removeAt(index) }
                 }
             }
             clearSelections()
@@ -319,7 +321,7 @@ class HomeFragment : Fragment() {
                                     )
                                 } else {
                                     filePathToSave = filePath
-                                    dataSeriesToSave = viewModel.dataSeries
+                                    recordingToSave = viewModel.dataSeries
                                     writeRequestLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                                 }
                                 val file = File(filePath)
@@ -361,23 +363,32 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private class FileListAdapter(context: Context, private val listView: ListView, private val files: List<FileInfo>) :
-        ArrayAdapter<FileInfo>(context, R.layout.list_item_file, files) {
+    private inner class FileListAdapter(context: Context, private val recordings: List<Recording>) :
+        ArrayAdapter<Recording>(context, R.layout.list_item_file, recordings) {
+        override fun getCount(): Int = recordings.size
+        override fun getItem(position: Int): Recording? = recordings[position]
+        override fun getItemId(position: Int): Long = position.toLong()
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val view = convertView ?: LayoutInflater.from(context).inflate(R.layout.list_item_file, parent, false)
 
-            val isSelected = listView.checkedItemPositions[position]
+            val dataSeries = recordings[position]
+            val fileNameImageView = view.findViewById<ImageView>(R.id.is_loaded)
+            val fileNameTextView = view.findViewById<TextView>(R.id.file_name)
+            val fileSizeTextView = view.findViewById<TextView>(R.id.file_size)
+            val hasGpsImageView = view.findViewById<ImageView>(R.id.has_gps)
+            val valueCntTextView = view.findViewById<TextView>(R.id.value_cnt)
+            fileNameImageView.setImageResource(if (dataSeries.isLoaded()) R.drawable.green_circle_16p else R.drawable.grey_circle_16p)
+            fileNameTextView.text = File(dataSeries.fileName).nameWithoutExtension
+            fileSizeTextView.text = formatFileSize(dataSeries.fileSize)
+            hasGpsImageView.setImageResource(if (dataSeries.hasGps) R.drawable.green_circle_16p else R.drawable.grey_circle_16p)
+            valueCntTextView.text = dataSeries.count.toString()
+
+            val isSelected = binding?.recordingsListView?.isItemChecked(position)
             view.setBackgroundColor(
-                if (isSelected) ContextCompat.getColor(context, android.R.color.holo_blue_light)
+                if (isSelected == true) ContextCompat.getColor(context, android.R.color.holo_blue_light)
                 else ContextCompat.getColor(context, android.R.color.transparent)
             )
-
-            val fileInfo = files[position]
-            val fileNameTextView = view.findViewById<TextView>(R.id.fileNameTextView)
-            val fileSizeTextView = view.findViewById<TextView>(R.id.fileSizeTextView)
-            fileNameTextView.text = fileInfo.name
-            fileSizeTextView.text = formatFileSize(fileInfo.size)
 
             return view
         }
@@ -395,12 +406,6 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun updateRecordingsList() {
-        fileListAdapter.clear()
-        fileListAdapter.addAll(viewModel.dataSeriesList)
-        fileListAdapter.notifyDataSetChanged()
-    }
-
     private fun updateButtonVisibility() {
         actionButtonsRecordings.visibility = if (recordingsListView.checkedItemCount > 0) {
             View.VISIBLE
@@ -415,7 +420,7 @@ class HomeFragment : Fragment() {
         for (i in 0 until checkedPositions.size) {
             if (checkedPositions.valueAt(i)) {
                 val position = checkedPositions.keyAt(i)
-                selectedItems.add(viewModel.dataSeriesList[position].name)
+                selectedItems.add(viewModel.recordings[position].fileName)
             }
         }
         return selectedItems

@@ -15,10 +15,10 @@ data class GpsLocation(val time: Float,
                        val latitude: Double, val longitude: Double, val altitude: Double)
 
 data class ESmogAndLocation(val time: Float,
-                            val level: Float, val frequency: Int,
+                            var level: Float, val frequency: Int,
                             var latitude: Double, var longitude: Double, var altitude: Double)
 
-class DataSeries {
+class Recording {
     var startTime: LocalDateTime = LocalDateTime.now()
     // Data series name
     var name = ""
@@ -33,7 +33,33 @@ class DataSeries {
     // Data series notes
     var seriesNotes = ""
     // Filename. If empty dataseries is not saved
-    var filename = ""
+    var fileName = ""
+    var fileSize: Long = 0
+    // User who provided this recording
+    var userName = ""
+
+    fun isSaved(): Boolean {
+        return fileName != ""
+    }
+
+    fun setSaved(fileName: String, fileSize: Long) {
+        this.fileName = fileName
+        this.fileSize = fileSize
+        compressedHex = null
+    }
+
+    fun isLoaded(): Boolean {
+        return compressedHex == null && !data.isEmpty() && !fileName.isEmpty()
+    }
+
+    fun load(): Boolean {
+        if (compressedHex == null) {
+            return false
+        }
+        data = CopyOnWriteArrayList(decompressData(compressedHex!!))
+        compressedHex = null
+        return true
+    }
 
     fun clear() {
         data = CopyOnWriteArrayList()
@@ -48,14 +74,6 @@ class DataSeries {
     fun add(value: ESmogAndLocation) {
         data.add(value)
         if (!hasGps && (value.latitude != 0.0 || value.longitude != 0.0 || value.altitude != 0.0)) {
-            hasGps = true
-        }
-    }
-
-    fun add(time: Float, level: Float, frequency: Int,
-            latitude: Double, longitude: Double, altitude: Double) {
-        data.add(ESmogAndLocation(time, level, frequency, latitude, longitude, altitude))
-        if (!hasGps && (latitude != 0.0 || longitude != 0.0 || altitude != 0.0)) {
             hasGps = true
         }
     }
@@ -91,21 +109,19 @@ class DataSeries {
     }
 
     companion object {
-        fun fromJson(jsonObject: JSONObject, decompress: Boolean): DataSeries {
-            val dataSeries = DataSeries()
-            dataSeries.name = jsonObject.optString("name")
-            dataSeries.version = jsonObject.getInt("version")
-            dataSeries.device = jsonObject.optString("device")
+        fun fromJson(jsonObject: JSONObject, fileName: String, fileSize: Long): Recording {
+            val recording = Recording()
+            recording.setSaved(fileName, fileSize)
+            recording.name = jsonObject.optString("name")
+            recording.version = jsonObject.getInt("version")
+            recording.device = jsonObject.optString("device")
             val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-            dataSeries.startTime = LocalDateTime.parse(jsonObject.get("start") as CharSequence?, formatter)
-            dataSeries.seriesNotes = jsonObject.optString("notes")
-            dataSeries.hasGps = jsonObject.getBoolean("has_gps")
-            dataSeries.compressedHex = jsonObject.optString("data")
-            dataSeries.count = jsonObject.getInt("count")
-            if (decompress && dataSeries.compressedHex != null) {
-                dataSeries.data = CopyOnWriteArrayList(decompressData(dataSeries.compressedHex!!))
-            }
-            return dataSeries
+            recording.startTime = LocalDateTime.parse(jsonObject.get("start") as CharSequence?, formatter)
+            recording.seriesNotes = jsonObject.optString("notes")
+            recording.hasGps = jsonObject.getBoolean("has_gps")
+            recording.compressedHex = jsonObject.optString("data")
+            recording.count = jsonObject.getInt("count")
+            return recording
         }
 
         fun decompressData(compressedHex: String): ArrayList<ESmogAndLocation> {
