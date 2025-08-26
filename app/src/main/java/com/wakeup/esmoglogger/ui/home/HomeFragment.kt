@@ -48,16 +48,18 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.getValue
 import androidx.core.util.size
+import org.json.JSONObject
 
 class HomeFragment : Fragment() {
     private val viewModel: SharedViewModel by activityViewModels()
     private var binding: FragmentHomeBinding? = null
     private lateinit var buttonRecord: MaterialButton
-    private lateinit var buttonDelete: MaterialButton
+    private lateinit var buttonDrop: MaterialButton
     private lateinit var buttonSave: MaterialButton
     private lateinit var recordingsListView: ListView
     private lateinit var actionButtonsRecordings: LinearLayout
     private lateinit var buttonLoadRecordings: MaterialButton
+    private lateinit var buttonDropRecordings: MaterialButton
     private lateinit var buttonDeleteRecordings: MaterialButton
     private lateinit var buttonShareRecordings: MaterialButton
 
@@ -135,8 +137,8 @@ class HomeFragment : Fragment() {
 
         buttonRecord = root.findViewById<MaterialButton>(R.id.button_record)
         val setNotesButton = root.findViewById<MaterialButton>(R.id.button_set_notes)
-        buttonDelete = root.findViewById<MaterialButton>(R.id.button_delete)
-        buttonSetEnabled(buttonDelete, false)
+        buttonDrop = root.findViewById<MaterialButton>(R.id.button_drop)
+        buttonSetEnabled(buttonDrop, false)
         buttonSave = root.findViewById<MaterialButton>(R.id.button_save)
         buttonSetEnabled(buttonSave, false)
 
@@ -177,7 +179,7 @@ class HomeFragment : Fragment() {
             )
         }
 
-        buttonDelete.setOnClickListener { v: View? ->
+        buttonDrop.setOnClickListener { v: View? ->
             showConfirmationDialog()
         }
 
@@ -223,11 +225,28 @@ class HomeFragment : Fragment() {
 
         actionButtonsRecordings = root.findViewById<LinearLayout>(R.id.action_buttons_recordings)
         buttonLoadRecordings = root.findViewById<MaterialButton>(R.id.button_load_recordings)
+        buttonDropRecordings = root.findViewById<MaterialButton>(R.id.button_drop_recordings)
         buttonDeleteRecordings = root.findViewById<MaterialButton>(R.id.button_delete_recordings)
         buttonShareRecordings = root.findViewById<MaterialButton>(R.id.button_share_recordings)
 
         buttonLoadRecordings.setOnClickListener {
+            val fileNames = getSelectedItems()
+            for (recording in viewModel.recordings) {
+                if (recording.fileName in fileNames && !recording.isLoaded()) {
+                    recording.load()
+                }
+            }
+            clearSelections()
+        }
 
+        buttonDropRecordings.setOnClickListener {
+            val fileNames = getSelectedItems()
+            for (recording in viewModel.recordings) {
+                if (recording.fileName in fileNames && !recording.isLoaded()) {
+                    recording.unload()
+                }
+            }
+            clearSelections()
         }
 
         buttonDeleteRecordings.setOnClickListener {
@@ -279,7 +298,7 @@ class HomeFragment : Fragment() {
             .setMessage("Do you want to delete recorded data?")
             .setPositiveButton("Yes") { _, _ ->
                 buttonSetEnabled(buttonRecord, true)
-                buttonSetEnabled(buttonDelete, false)
+                buttonSetEnabled(buttonDrop, false)
                 buttonSetEnabled(buttonSave, false)
                 viewModel.clear()
                 view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
@@ -308,7 +327,7 @@ class HomeFragment : Fragment() {
                         "stop" -> {
                             viewModel.stopRecording(text)
                             buttonSetEnabled(buttonRecord, false)
-                            buttonSetEnabled(buttonDelete, true)
+                            buttonSetEnabled(buttonDrop, true)
                             buttonSetEnabled(buttonSave, true)
                         }
                         "save" -> {
@@ -328,7 +347,7 @@ class HomeFragment : Fragment() {
                                 viewModel.saved(FileInfo(file.name, file.length(), viewModel.dataSeries.hasGps, viewModel.dataSeries.count))
                                 //updateRecordingsList()
                                 buttonSetEnabled(buttonRecord, true)
-                                buttonSetEnabled(buttonDelete, false)
+                                buttonSetEnabled(buttonDrop, false)
                                 buttonSetEnabled(buttonSave, false)
                             } catch (e: Exception) {
                                 e.printStackTrace()

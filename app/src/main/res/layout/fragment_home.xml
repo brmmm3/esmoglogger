@@ -107,11 +107,11 @@
             android:drawableTop="@drawable/notes_32p" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/button_delete"
+            android:id="@+id/button_drop"
             android:layout_width="wrap_content"
             android:layout_height="54dp"
             android:layout_marginEnd="8dp"
-            app:icon="@drawable/button_delete"
+            app:icon="@drawable/button_drop"
             app:iconGravity="textStart"
             app:iconTint="@null"
             android:enabled="false" />
@@ -173,6 +173,15 @@
             app:iconGravity="textStart"
             app:iconTint="#FF0000"
             android:drawableTop="@drawable/import_32p" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_drop_recordings"
+            android:layout_width="wrap_content"
+            android:layout_height="54dp"
+            android:layout_marginEnd="8dp"
+            app:icon="@drawable/button_drop"
+            app:iconGravity="textStart"
+            app:iconTint="@null" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/button_delete_recordings"

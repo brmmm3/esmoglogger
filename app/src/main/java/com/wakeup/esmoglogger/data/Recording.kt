@@ -61,6 +61,11 @@ class Recording {
         return true
     }
 
+    fun unload() {
+        compressData()
+        data.clear()
+    }
+
     fun clear() {
         data = CopyOnWriteArrayList()
     }
@@ -130,12 +135,12 @@ class Recording {
             for (i in 0 until jsonArray.length()) {
                 val jsonObject = jsonArray.getJSONArray(i) ?: continue
                 data.add(ESmogAndLocation(
-                    jsonObject.get(0) as Float,
-                    jsonObject.get(1) as Float,
-                    jsonObject.get(2) as Int,
-                    jsonObject.get(3) as Double,
-                    jsonObject.get(4) as Double,
-                    jsonObject.get(5) as Double
+                    jsonObject.getDouble(0).toFloat(),
+                    jsonObject.getDouble(1).toFloat(),
+                    jsonObject.getInt(2),
+                    jsonObject.getDouble(3),
+                    jsonObject.getDouble(4),
+                    jsonObject.getDouble(5)
                 ))
             }
             return data
