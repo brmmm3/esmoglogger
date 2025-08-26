@@ -145,7 +145,7 @@ class HomeFragment : Fragment() {
         buttonSave = root.findViewById<MaterialButton>(R.id.button_save)
         buttonSetEnabled(buttonSave, false)
 
-        if (viewModel.recording.value == true) {
+        if (viewModel.isRecording.value == true) {
             val dt = Duration.between(startTime, LocalDateTime.now())
             view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "${dt.toMillis() / 1000} s"
             buttonRecord.setIconResource(R.drawable.stop_32p)
@@ -153,7 +153,7 @@ class HomeFragment : Fragment() {
             buttonRecord.setIconResource(R.drawable.record_32p)
         }
         buttonRecord.setOnClickListener { v: View? ->
-            if (viewModel.recording.value == true) {
+            if (viewModel.isRecording.value == true) {
                 handler.removeCallbacks(updateTimeRunnable)
                 SharedSerialData.stop()
                 buttonRecord.setIconResource(R.drawable.record_32p)
@@ -171,7 +171,7 @@ class HomeFragment : Fragment() {
                     },
                     {
                         viewModel.stopRecording("")
-                        viewModel.dataSeries.clear()
+                        viewModel.recording.clear()
                         view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
                     }
                 )
@@ -213,15 +213,15 @@ class HomeFragment : Fragment() {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || checkStoragePermission()) {
                             jsonViewModel.saveJsonToStorage(
                                 requireContext().contentResolver, requireContext(),
-                                filePath, viewModel.dataSeries
+                                filePath, viewModel.recording
                             )
                         } else {
                             filePathToSave = filePath
-                            recordingToSave = viewModel.dataSeries
+                            recordingToSave = viewModel.recording
                             writeRequestLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                         }
                         val file = File(filePath)
-                        viewModel.saved(FileInfo(file.name, file.length(), viewModel.dataSeries.hasGps, viewModel.dataSeries.count))
+                        viewModel.saved(FileInfo(file.name, file.length(), viewModel.recording.hasGps, viewModel.recording.count))
                         //updateRecordingsList()
                         buttonSetEnabled(buttonRecord, true)
                         buttonSetEnabled(buttonDrop, false)

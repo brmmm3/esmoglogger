@@ -44,7 +44,6 @@ class MapViewFragment : Fragment() {
         // Initialize marker for current location
         currentLocationMarker = Marker(mapView)
         currentLocationMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-        currentLocationMarker.title = "Current Location"
         // Optional: Set a custom marker icon (add drawable to res/drawable)
         // currentLocationMarker.setIcon(getDrawable(R.drawable.ic_marker))
         mapView.overlays.add(currentLocationMarker)
@@ -88,10 +87,25 @@ class MapViewFragment : Fragment() {
                 }
             }
         }
+        viewModel.esmog.observe(viewLifecycleOwner) { value ->
+            currentLocationMarker.title = "${value.level} mW"
+            mapView.invalidate() // Refresh map to show updated path
+        }
 
         Thread {
-            viewModel.dataSeries.data.forEach { value ->
-                viewModel.enqueueLocationAndESmog(value)
+            var new = true
+            for (recording in viewModel.recordings) {
+                if (recording.isLoaded()) {
+                    recording.data.forEach { value ->
+                        viewModel.enqueueLocationAndESmog(value, new)
+                        new = false
+                    }
+                }
+            }
+            new = true
+            viewModel.recording.data.forEach { value ->
+                viewModel.enqueueLocationAndESmog(value, new)
+                new = false
             }
         }.start()
     }

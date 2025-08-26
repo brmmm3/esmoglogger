@@ -23,8 +23,8 @@ class SharedViewModel: ViewModel() {
     private val _gps = MutableLiveData<Boolean>()
     val gps: LiveData<Boolean> get() = _gps
     // Enable/Disable ESmog (and GPS) recording
-    private val _recording = MutableLiveData<Boolean>()
-    val recording: LiveData<Boolean> get() = _recording
+    private val _isRecording = MutableLiveData<Boolean>()
+    val isRecording: LiveData<Boolean> get() = _isRecording
     // Dataseries has been saved to file
     private val _saved = MutableLiveData<FileInfo>()
     val saved: LiveData<FileInfo> get() = _saved
@@ -51,7 +51,7 @@ class SharedViewModel: ViewModel() {
     val location: LiveData<GpsLocation> get() = _location
     // DataSeries
     val recordings: MutableList<Recording> = mutableListOf()
-    var dataSeries = Recording()
+    var recording = Recording()
 
     fun startGps() {
         _gps.value = true
@@ -63,19 +63,19 @@ class SharedViewModel: ViewModel() {
 
     fun startRecording() {
         clear()
-        dataSeries.start()
-        _recording.value = true
+        recording.start()
+        _isRecording.value = true
     }
 
     fun stopRecording(name: String) {
-        dataSeries.stop(name)
-        _recording.value = false
+        recording.stop(name)
+        _isRecording.value = false
     }
 
     fun clear() {
         mapViewZoom = 18.0
         lastESmogPos = 0
-        dataSeries = Recording()
+        recording = Recording()
     }
 
     fun enqueueESmog(value: ESmog) {
@@ -84,33 +84,33 @@ class SharedViewModel: ViewModel() {
         }
     }
 
-    fun enqueueLocationAndESmog(value: ESmogAndLocation) {
+    fun enqueueLocationAndESmog(value: ESmogAndLocation, new: Boolean) {
         viewModelScope.launch {
-            _mapViewDataQueue.emit(MapViewData(value, false))
+            _mapViewDataQueue.emit(MapViewData(value, new))
         }
     }
 
     fun addESmog(level: Float, frequency: Int) {
-        val dt = Duration.between(dataSeries.startTime, LocalDateTime.now()).toMillis().toFloat() / 1000f
+        val dt = Duration.between(recording.startTime, LocalDateTime.now()).toMillis().toFloat() / 1000f
         val gpsLocation: GpsLocation = location.value ?: GpsLocation(0f, 0.0, 0.0, 0.0)
         val value = ESmog(dt, level, frequency)
         _esmog.postValue(value)
         viewModelScope.launch {
             _esmogQueue.emit(value)
         }
-        if (recording.value == true) {
-            dataSeries.add(ESmogAndLocation(dt, level, frequency, gpsLocation.latitude, gpsLocation.longitude, gpsLocation.altitude))
+        if (isRecording.value == true) {
+            recording.add(ESmogAndLocation(dt, level, frequency, gpsLocation.latitude, gpsLocation.longitude, gpsLocation.altitude))
         }
     }
 
     fun addLocation(location: Location) {
-        val dt = Duration.between(dataSeries.startTime, LocalDateTime.now()).toMillis().toFloat() / 1000f
+        val dt = Duration.between(recording.startTime, LocalDateTime.now()).toMillis().toFloat() / 1000f
         _location.postValue(GpsLocation(dt, location.latitude, location.longitude, location.altitude))
         viewModelScope.launch {
-            var cnt = dataSeries.data.size - lastESmogPos
+            var cnt = recording.data.size - lastESmogPos
             if (cnt > 0) {
-                println("GPS ${dataSeries.data.size} $cnt (${location.latitude} ${location.longitude} ${location.altitude})")
-                val refValue = dataSeries.data[lastESmogPos]!!.copy()
+                println("GPS ${recording.data.size} $cnt (${location.latitude} ${location.longitude} ${location.altitude})")
+                val refValue = recording.data[lastESmogPos]!!.copy()
                 _mapViewDataQueue.emit(MapViewData(refValue, false))
                 val dLatitude = (location.latitude - refValue.latitude) / cnt
                 val dLongitude = (location.longitude - refValue.longitude) / cnt
@@ -123,11 +123,11 @@ class SharedViewModel: ViewModel() {
                     pos++
                     cnt--
                     lastESmogPos++
-                    val value = dataSeries.data[lastESmogPos]!!
+                    val value = recording.data[lastESmogPos]!!
                     value.latitude = refValue.latitude + dLatitude * pos
                     value.longitude = refValue.longitude + dLongitude * pos
                     value.altitude = refValue.altitude + dAltitude * pos
-                    dataSeries.data[lastESmogPos] = value
+                    recording.data[lastESmogPos] = value
                     if (moving) {
                         println("*$pos $cnt $lastESmogPos: $value")
                         _mapViewDataQueue.emit(MapViewData(value, false))
@@ -136,12 +136,12 @@ class SharedViewModel: ViewModel() {
                     }
                 }
                 lastESmogPos++
-                if (lastESmogPos < dataSeries.data.size) {
-                    var value = dataSeries.data[lastESmogPos]!!
+                if (lastESmogPos < recording.data.size) {
+                    var value = recording.data[lastESmogPos]!!
                     value.latitude = location.latitude
                     value.longitude = location.longitude
                     value.altitude = location.altitude
-                    dataSeries.data[lastESmogPos] = value
+                    recording.data[lastESmogPos] = value
                     println("= $lastESmogPos: $value")
                     if (!moving) {
                         value = value.copy()
@@ -150,7 +150,7 @@ class SharedViewModel: ViewModel() {
                     _mapViewDataQueue.emit(MapViewData(value, false))
                 }
             } else {
-                val esmog: ESmog = if (recording.value == true) {
+                val esmog: ESmog = if (isRecording.value == true) {
                     esmog.value ?: ESmog(0f, 0f, 0)
                 } else {
                     ESmog(0f, 0f, 0)
@@ -162,13 +162,13 @@ class SharedViewModel: ViewModel() {
     }
 
     fun setNotes(notes: String) {
-        dataSeries.setNotes(notes)
+        recording.setNotes(notes)
     }
 
     fun saved(fileInfo: FileInfo) {
-        dataSeries.fileName = fileInfo.name
-        dataSeries.fileSize = fileInfo.size
-        recordings.add(dataSeries)
+        recording.fileName = fileInfo.name
+        recording.fileSize = fileInfo.size
+        recordings.add(recording)
         _saved.postValue(fileInfo)
     }
 }

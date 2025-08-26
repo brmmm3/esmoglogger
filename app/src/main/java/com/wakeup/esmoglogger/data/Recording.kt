@@ -9,14 +9,20 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.Float
 
 data class ESmog(val time: Float,
-                 val level: Float, val frequency: Int)
+                 val level: Float,
+                 val frequency: Int)
 
 data class GpsLocation(val time: Float,
-                       val latitude: Double, val longitude: Double, val altitude: Double)
+                       val latitude: Double,
+                       val longitude: Double,
+                       val altitude: Double)
 
 data class ESmogAndLocation(val time: Float,
-                            var level: Float, val frequency: Int,
-                            var latitude: Double, var longitude: Double, var altitude: Double)
+                            var level: Float,
+                            val frequency: Int,
+                            var latitude: Double,
+                            var longitude: Double,
+                            var altitude: Double)
 
 class Recording {
     var startTime: LocalDateTime = LocalDateTime.now()

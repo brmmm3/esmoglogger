@@ -85,7 +85,7 @@ class ChartViewFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         Thread {
-            viewModel.dataSeries.data.forEach { value ->
+            viewModel.recording.data.forEach { value ->
                 viewModel.enqueueESmog(ESmog(value.time, value.level, value.frequency))
             }
         }.start()
