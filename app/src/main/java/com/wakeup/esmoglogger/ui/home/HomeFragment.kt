@@ -16,6 +16,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
@@ -55,6 +56,8 @@ class HomeFragment : Fragment() {
     private lateinit var buttonRecord: MaterialButton
     private lateinit var buttonDrop: MaterialButton
     private lateinit var buttonSave: MaterialButton
+    private lateinit var recordingsHeaderScrollView: HorizontalScrollView
+    private lateinit var recordingsScrollView: HorizontalScrollView
     private lateinit var recordingsListView: ListView
     private lateinit var actionButtonsRecordings: LinearLayout
     private lateinit var buttonLoadRecordings: MaterialButton
@@ -232,6 +235,18 @@ class HomeFragment : Fragment() {
             )
         }
 
+        // Synchronize horizontal scrolling between header and list
+        recordingsHeaderScrollView = root.findViewById(R.id.recordings_header_scroll_view)
+        recordingsHeaderScrollView.isHorizontalScrollBarEnabled = false
+        recordingsScrollView = root.findViewById(R.id.recordings_scroll_view)
+
+        recordingsScrollView.setOnScrollChangeListener { _, scrollX, _, _, _ ->
+            recordingsHeaderScrollView.scrollTo(scrollX, 0)
+        }
+        recordingsHeaderScrollView.setOnScrollChangeListener { _, scrollX, _, _, _ ->
+            recordingsScrollView.scrollTo(scrollX, 0)
+        }
+
         recordingsListView = root.findViewById(R.id.recordings_list_view)
 
         fileListAdapter = FileListAdapter(
@@ -242,20 +257,10 @@ class HomeFragment : Fragment() {
         recordingsListView.choiceMode = ListView.CHOICE_MODE_MULTIPLE
         recordingsListView.isHorizontalScrollBarEnabled = true
 
-        val headerView = layoutInflater.inflate(R.layout.list_header_file, recordingsListView, false)
-        recordingsListView.addHeaderView(headerView)
-
         recordingsListView.setOnItemClickListener { _, _, position, _ ->
             recordingsListView.setItemChecked(position, recordingsListView.isItemChecked(position))
             fileListAdapter.notifyDataSetChanged()
             updateButtonVisibility()
-        }
-
-        recordingsListView.setOnItemLongClickListener { _, _, position, _ ->
-            recordingsListView.setItemChecked(position, !recordingsListView.isItemChecked(position))
-            fileListAdapter.notifyDataSetChanged()
-            updateButtonVisibility()
-            true
         }
 
         viewModel.saved.observe( viewLifecycleOwner) { fileInfo ->
