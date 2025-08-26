@@ -48,7 +48,6 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.getValue
 import androidx.core.util.size
-import org.json.JSONObject
 
 class HomeFragment : Fragment() {
     private val viewModel: SharedViewModel by activityViewModels()
@@ -112,6 +111,7 @@ class HomeFragment : Fragment() {
         }
     }
 
+    @SuppressLint("ObsoleteSdkInt")
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?, savedInstanceState: Bundle?
@@ -159,7 +159,18 @@ class HomeFragment : Fragment() {
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                 showTextInputDialog(
                     "Name of recording", "Enter name of recording",
-                    "stop", currentDateTime.format(formatter), true
+                    currentDateTime.format(formatter), true,
+                    { text ->
+                        viewModel.stopRecording(text)
+                        buttonSetEnabled(buttonRecord, false)
+                        buttonSetEnabled(buttonDrop, true)
+                        buttonSetEnabled(buttonSave, true)
+                    },
+                    {
+                        viewModel.stopRecording("")
+                        viewModel.dataSeries.clear()
+                        view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
+                    }
                 )
             } else {
                 SharedSerialData.start()
@@ -175,7 +186,11 @@ class HomeFragment : Fragment() {
         setNotesButton?.setOnClickListener { v: View? ->
             showTextInputDialog(
                 "Notes", "Enter notes",
-                "notes", "", false
+                "", false,
+                { text ->
+                    viewModel.setNotes(text)
+                },
+                {}
             )
         }
 
@@ -188,7 +203,32 @@ class HomeFragment : Fragment() {
             val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd.HH_mm_ss")
             showTextInputDialog(
                 "Filename", "Enter filename without extension",
-                "save", "ESMOG-${currentDateTime.format(formatter)}", true
+                "ESMOG-${currentDateTime.format(formatter)}", true,
+                { text ->
+                    try {
+                        val filePath = getFilePath("${text}.json")
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || checkStoragePermission()) {
+                            jsonViewModel.saveJsonToStorage(
+                                requireContext().contentResolver, requireContext(),
+                                filePath, viewModel.dataSeries
+                            )
+                        } else {
+                            filePathToSave = filePath
+                            recordingToSave = viewModel.dataSeries
+                            writeRequestLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        }
+                        val file = File(filePath)
+                        viewModel.saved(FileInfo(file.name, file.length(), viewModel.dataSeries.hasGps, viewModel.dataSeries.count))
+                        //updateRecordingsList()
+                        buttonSetEnabled(buttonRecord, true)
+                        buttonSetEnabled(buttonDrop, false)
+                        buttonSetEnabled(buttonSave, false)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Toast.makeText(context, "Failed to save: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                },
+                {}
             )
         }
 
@@ -311,7 +351,8 @@ class HomeFragment : Fragment() {
     }
 
     @SuppressLint("ObsoleteSdkInt")
-    private fun showTextInputDialog(title: String, hintText: String, command: String, default: String, singleLine: Boolean) {
+    private fun showTextInputDialog(title: String, hintText: String, default: String, singleLine: Boolean,
+                                    cbOk: (String) -> Unit, cbCancel: () -> Unit) {
         val input = EditText(requireContext()).apply {
             hint = hintText
             isSingleLine = singleLine
@@ -323,52 +364,14 @@ class HomeFragment : Fragment() {
             .setPositiveButton("OK") { _, _ ->
                 val text = input.text.toString().trim()
                 if (text.isNotEmpty()) {
-                    when (command) {
-                        "stop" -> {
-                            viewModel.stopRecording(text)
-                            buttonSetEnabled(buttonRecord, false)
-                            buttonSetEnabled(buttonDrop, true)
-                            buttonSetEnabled(buttonSave, true)
-                        }
-                        "save" -> {
-                            try {
-                                val filePath = getFilePath("${text}.json")
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || checkStoragePermission()) {
-                                    jsonViewModel.saveJsonToStorage(
-                                        requireContext().contentResolver, requireContext(),
-                                        filePath, viewModel.dataSeries
-                                    )
-                                } else {
-                                    filePathToSave = filePath
-                                    recordingToSave = viewModel.dataSeries
-                                    writeRequestLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                                }
-                                val file = File(filePath)
-                                viewModel.saved(FileInfo(file.name, file.length(), viewModel.dataSeries.hasGps, viewModel.dataSeries.count))
-                                //updateRecordingsList()
-                                buttonSetEnabled(buttonRecord, true)
-                                buttonSetEnabled(buttonDrop, false)
-                                buttonSetEnabled(buttonSave, false)
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                                Toast.makeText(context, "Failed to save: ${e.message}", Toast.LENGTH_LONG).show()
-                            }
-                        }
-                        "notes" -> {
-                            viewModel.setNotes(text)
-                        }
-                    }
+                    cbOk(text)
                 } else {
                     Toast.makeText(requireContext(), "Bitte Text eingeben", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Cancel") { dialog, _ ->
                 dialog.dismiss() // Dialog schließen
-                if (command == "stop") {
-                    viewModel.stopRecording("")
-                    viewModel.dataSeries.clear()
-                    view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
-                }
+                cbCancel()
             }
             .show()
     }
