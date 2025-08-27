@@ -6,6 +6,9 @@ import android.os.Build
 import androidx.core.graphics.toColorInt
 import com.google.android.material.button.MaterialButton
 
+const val PREFS_KEY: String = "ESmogLogger"
+const val PREFS_DARKMODE: String = "DarkMode"
+
 data class FileInfo(val name: String, val size: Long, val hasGps: Boolean, val count: Int)
 
 val levelColors = arrayListOf(

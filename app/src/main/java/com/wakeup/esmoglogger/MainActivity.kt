@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.Environment
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -17,14 +18,14 @@ import androidx.navigation.ui.NavigationUI.setupActionBarWithNavController
 import androidx.navigation.ui.NavigationUI.setupWithNavController
 import com.wakeup.esmoglogger.data.Recording
 import com.wakeup.esmoglogger.databinding.ActivityMainBinding
-import com.wakeup.esmoglogger.serialcommunication.SerialCommunication
 import com.wakeup.esmoglogger.location.LocationHandler
+import com.wakeup.esmoglogger.serialcommunication.SerialCommunication
 import com.wakeup.esmoglogger.serialcommunication.SharedSerialData
 import com.wakeup.esmoglogger.ui.log.SharedLogData
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.osmdroid.config.Configuration
-import kotlin.getValue
+
 
 /* https://hcfricke.com/2018/09/19/emf-11-cornet-ed88t-plus-ein-tri-meter-unter-200e-taugt-es-was/
 
@@ -103,6 +104,13 @@ class MainActivity : AppCompatActivity() {
 
         if (checkStoragePermissions()) {
             listDirectoryContents()
+        }
+
+        val prefs = getSharedPreferences(PREFS_KEY, MODE_PRIVATE)
+        if (prefs.getBoolean(PREFS_DARKMODE, false)) {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+        } else {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
         }
     }
 
