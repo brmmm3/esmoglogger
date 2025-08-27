@@ -107,7 +107,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val prefs = getSharedPreferences(PREFS_KEY, MODE_PRIVATE)
-        if (prefs.getBoolean(PREFS_DARKMODE, false)) {
+        if (prefs.getBoolean(PREFS_DARKMODE, true)) {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         } else {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
