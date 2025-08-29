@@ -1,5 +1,6 @@
 package com.wakeup.esmoglogger.ui.mapview
 
+import android.annotation.SuppressLint
 import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -59,6 +60,7 @@ class MapViewFragment : Fragment() {
         return view
     }
 
+    @SuppressLint("DefaultLocale")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         viewLifecycleOwner.lifecycleScope.launch {
@@ -74,7 +76,7 @@ class MapViewFragment : Fragment() {
                         val newPath = Polyline()
                         newPath.color = color
                         newPath.width = 8f
-                        if (!pathSegments.isEmpty() && pathSegments.last().points.isNotEmpty()) {
+                        if (!data.new && !pathSegments.isEmpty() && pathSegments.last().points.isNotEmpty()) {
                             newPath.addPoint(pathSegments.last().points.lastOrNull())
                         }
                         pathSegments.add(newPath)
@@ -88,20 +90,26 @@ class MapViewFragment : Fragment() {
             }
         }
         viewModel.esmog.observe(viewLifecycleOwner) { value ->
-            currentLocationMarker.title = "${value.level} mW"
-            mapView.invalidate() // Refresh map to show updated path
+            currentLocationMarker.title = String.format("%6.2f mW", value.level)
+            if (currentLocationMarker.isInfoWindowShown) {
+                currentLocationMarker.closeInfoWindow()
+                currentLocationMarker.showInfoWindow()
+            }
         }
 
         Thread {
             var new = true
+            // Show loaded recordings
             for (recording in viewModel.recordings) {
                 if (recording.isLoaded()) {
+                    new = true
                     recording.data.forEach { value ->
                         viewModel.enqueueLocationAndESmog(value, new)
                         new = false
                     }
                 }
             }
+            // Show latest (not saved) recording
             new = true
             viewModel.recording.data.forEach { value ->
                 viewModel.enqueueLocationAndESmog(value, new)

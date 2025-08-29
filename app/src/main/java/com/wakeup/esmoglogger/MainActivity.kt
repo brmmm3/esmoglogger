@@ -2,15 +2,10 @@
 
 package com.wakeup.esmoglogger
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Bundle
-import android.os.Environment
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
@@ -43,8 +38,6 @@ class MainActivity : AppCompatActivity() {
     private var serial: SerialCommunication? = null
     private lateinit var locationHandler: LocationHandler
     private val viewModel: SharedViewModel by viewModels()
-
-    private val STORAGE_PERMISSION_REQUEST_CODE = 1001
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,9 +95,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        if (checkStoragePermissions()) {
-            listDirectoryContents()
-        }
+        addAllSavedRecordings()
 
         val prefs = getSharedPreferences(PREFS_KEY, MODE_PRIVATE)
         if (prefs.getBoolean(PREFS_DARKMODE, true)) {
@@ -119,24 +110,11 @@ class MainActivity : AppCompatActivity() {
         serial?.cleanup()
     }
 
-    private fun checkStoragePermissions(): Boolean {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
-                STORAGE_PERMISSION_REQUEST_CODE
-            )
-            return false
-        }
-        return true
-    }
-
-    private fun listDirectoryContents() {
-        val directory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        println("DIR=$directory")
+    private fun addAllSavedRecordings() {
+        viewModel.recordings.clear()
+        val directory = this.filesDir
         for (file in directory.listFiles()!!) {
-            println("FILE=$file")
-            if (file.exists() && file.name.startsWith("ESMOG-") && file.extension == "json") {
+            if (file.isFile && file.name.startsWith("ESMOG-") && file.extension == "json") {
                 viewModel.recordings.add(Recording.fromJson(JSONObject(file.readText()), file.name, file.length()))
             }
         }

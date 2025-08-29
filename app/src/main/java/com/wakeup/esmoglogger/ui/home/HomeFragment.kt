@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.util.SparseBooleanArray
@@ -22,7 +21,6 @@ import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -74,21 +72,7 @@ class HomeFragment : Fragment() {
 
     private val jsonViewModel: JsonViewModel by viewModels()
 
-    private var filePathToSave: String? = null
-    private var recordingToSave: Recording? = null
-
     private val handler = Handler(Looper.getMainLooper())
-
-    private val writeRequestLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-        if (isGranted) {
-            jsonViewModel.saveJsonToStorage(
-                requireContext().contentResolver, requireContext(),
-                filePathToSave!!, recordingToSave!!
-            )
-        } else {
-            Toast.makeText(requireContext(), "Speicherzugriff verweigert", Toast.LENGTH_SHORT).show()
-        }
-    }
 
     private val updateTimeRunnable = object : Runnable {
         override fun run() {
@@ -198,7 +182,15 @@ class HomeFragment : Fragment() {
         }
 
         buttonDrop.setOnClickListener { v: View? ->
-            showConfirmationDialog()
+            showConfirmationDialog("Drop unsaved recording",
+                "Do you want to drop unsaved recording?"
+            ) {
+                buttonSetEnabled(buttonRecord, true)
+                buttonSetEnabled(buttonDrop, false)
+                buttonSetEnabled(buttonSave, false)
+                viewModel.clear()
+                view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
+            }
         }
 
         buttonSave.setOnClickListener { v: View? ->
@@ -209,17 +201,10 @@ class HomeFragment : Fragment() {
                 "ESMOG-${currentDateTime.format(formatter)}", true,
                 { text ->
                     try {
-                        val filePath = getFilePath("${text}.json")
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || checkStoragePermission()) {
-                            jsonViewModel.saveJsonToStorage(
-                                requireContext().contentResolver, requireContext(),
-                                filePath, viewModel.recording
-                            )
-                        } else {
-                            filePathToSave = filePath
-                            recordingToSave = viewModel.recording
-                            writeRequestLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                        }
+                        val filePath = "${text}.json"
+                        jsonViewModel.saveJsonToStorage(
+                            requireContext(), filePath, viewModel.recording
+                        )
                         val file = File(filePath)
                         viewModel.saved(FileInfo(file.name, file.length(), viewModel.recording.hasGps, viewModel.recording.count))
                         //updateRecordingsList()
@@ -287,7 +272,7 @@ class HomeFragment : Fragment() {
         buttonDropRecordings.setOnClickListener {
             val fileNames = getSelectedItems()
             for (recording in viewModel.recordings) {
-                if (recording.fileName in fileNames && !recording.isLoaded()) {
+                if (recording.fileName in fileNames && recording.isLoaded()) {
                     recording.unload()
                 }
             }
@@ -295,20 +280,25 @@ class HomeFragment : Fragment() {
         }
 
         buttonDeleteRecordings.setOnClickListener {
-            val selectedItems = getSelectedItems()
-            val fileIndex = HashMap<String, Int>()
-            viewModel.recordings.forEachIndexed { index, dataSeries ->
-                fileIndex.put(dataSeries.fileName, index)
-            }
-            val sdCard = Environment.getExternalStorageDirectory()
-            selectedItems.reversed().forEach { filename ->
-                if (File(sdCard, "${Environment.DIRECTORY_DOCUMENTS}/${filename}").delete()) {
-                    fileIndex.get(filename)?.let { index -> viewModel.recordings.removeAt(index) }
+            showConfirmationDialog("Delete recordings",
+                "Do you want to delete recordings?"
+            ) {
+                val selectedItems = getSelectedItems()
+                val fileIndex = HashMap<String, Int>()
+                viewModel.recordings.forEachIndexed { index, dataSeries ->
+                    fileIndex.put(dataSeries.fileName, index)
                 }
+                val directory = requireContext().filesDir
+                selectedItems.reversed().forEach { filename ->
+                    if (File(directory, filename).delete()) {
+                        fileIndex.get(filename)
+                            ?.let { index -> viewModel.recordings.removeAt(index) }
+                    }
+                }
+                clearSelections()
+                fileListAdapter.notifyDataSetChanged()
+                updateButtonVisibility()
             }
-            clearSelections()
-            fileListAdapter.notifyDataSetChanged()
-            updateButtonVisibility()
         }
 
         buttonShareRecordings.setOnClickListener {
@@ -331,22 +321,12 @@ class HomeFragment : Fragment() {
         binding = null
     }
 
-    @SuppressLint("ObsoleteSdkInt")
-    fun getFilePath(fileName: String): String {
-        val sdCard = Environment.getExternalStorageDirectory()
-        return File(sdCard, "${Environment.DIRECTORY_DOCUMENTS}/${fileName}").path
-    }
-
-    private fun showConfirmationDialog() {
+    private fun showConfirmationDialog(title: String, message: String, cbOk: () -> Unit) {
         AlertDialog.Builder(requireContext())
-            .setTitle("Delete recorded data")
-            .setMessage("Do you want to delete recorded data?")
+            .setTitle(title)
+            .setMessage(message)
             .setPositiveButton("Yes") { _, _ ->
-                buttonSetEnabled(buttonRecord, true)
-                buttonSetEnabled(buttonDrop, false)
-                buttonSetEnabled(buttonSave, false)
-                viewModel.clear()
-                view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
+                cbOk()
             }
             .setNegativeButton("No") { dialog, _ ->
                 dialog.dismiss()
