@@ -1,6 +1,7 @@
 package com.wakeup.esmoglogger.ui.mapview
 
 import android.annotation.SuppressLint
+import android.content.Context.MODE_PRIVATE
 import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -21,6 +22,11 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import com.wakeup.esmoglogger.getLevelColor
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import org.osmdroid.config.Configuration
+import org.osmdroid.util.BoundingBox
 
 data class MapViewData(val value: ESmogAndLocation, val new: Boolean)
 
@@ -39,8 +45,10 @@ class MapViewFragment : Fragment() {
         // Initialize MapView
         mapView = view.findViewById(R.id.map)
         mapView.setTileSource(TileSourceFactory.MAPNIK)
+        mapView.setUseDataConnection(true) // Allow downloading tiles when online
         mapView.setMultiTouchControls(true)
         mapView.controller.setZoom(viewModel.mapViewZoom)
+        mapView.controller.setCenter(GeoPoint(48.2035, 15.6233)) // Set initial location St. Pölten
 
         // Initialize marker for current location
         currentLocationMarker = Marker(mapView)
@@ -125,11 +133,39 @@ class MapViewFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        Configuration.getInstance().load(requireContext(), requireContext().getSharedPreferences("osmdroid", MODE_PRIVATE))
         mapView.onResume()
     }
 
     override fun onPause() {
         super.onPause()
+        Configuration.getInstance().save(requireContext(), requireContext().getSharedPreferences("osmdroid", MODE_PRIVATE))
         mapView.onPause()
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    fun preloadTiles(mapView: MapView, boundingBox: BoundingBox, minZoom: Int, maxZoom: Int) {
+        GlobalScope.launch(Dispatchers.Main) {
+            for (zoom in minZoom..maxZoom) {
+                mapView.controller.setZoom(zoom.toDouble())
+                // Calculate step sizes
+                val latStep = (boundingBox.latNorth - boundingBox.latSouth) / 10
+                val lonStep = (boundingBox.lonEast - boundingBox.lonWest) / 10
+
+                // Iterate over latitude
+                var lat = boundingBox.latSouth
+                while (lat <= boundingBox.latNorth) {
+                    // Iterate over longitude
+                    var lon = boundingBox.lonWest
+                    while (lon <= boundingBox.lonEast) {
+                        mapView.controller.setCenter(GeoPoint(lat, lon))
+                        mapView.invalidate() // Force redraw to load tiles
+                        kotlinx.coroutines.delay(100) // Small delay to allow tile loading
+                        lon += lonStep
+                    }
+                    lat += latStep
+                }
+            }
+        }
     }
 }

@@ -2,6 +2,8 @@
 
 package com.wakeup.esmoglogger
 
+import android.content.Context
+import android.net.ConnectivityManager
 import android.os.Bundle
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -20,6 +22,7 @@ import com.wakeup.esmoglogger.ui.log.SharedLogData
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.osmdroid.config.Configuration
+import java.io.File
 
 
 /* https://hcfricke.com/2018/09/19/emf-11-cornet-ed88t-plus-ein-tri-meter-unter-200e-taugt-es-was/
@@ -42,9 +45,14 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Set custom user-agent for osmdroid to comply with OSM policy
-        Configuration.getInstance().userAgentValue = applicationContext.packageName + "/1.0"
-        Configuration.getInstance().load(applicationContext, getPreferences(MODE_PRIVATE))
+        // Set OSMDroid configuration before inflating the layout
+        val osmConfig = Configuration.getInstance()
+        osmConfig.userAgentValue = applicationContext.packageName + "/1.0"
+        osmConfig.load(applicationContext, getPreferences(MODE_PRIVATE))
+        // Set custom cache directory
+        val cacheDir = File(cacheDir, "osmdroid_cache")
+        cacheDir.mkdirs()
+        osmConfig.osmdroidTileCache = cacheDir
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding!!.getRoot())
@@ -108,6 +116,12 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         serial?.cleanup()
+    }
+
+    fun isOnline(): Boolean {
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val networkInfo = connectivityManager.activeNetworkInfo
+        return networkInfo != null && networkInfo.isConnected
     }
 
     private fun addAllSavedRecordings() {

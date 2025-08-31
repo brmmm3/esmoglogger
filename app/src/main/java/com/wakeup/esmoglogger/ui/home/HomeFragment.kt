@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -22,6 +23,7 @@ import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -302,14 +304,23 @@ class HomeFragment : Fragment() {
         }
 
         buttonShareRecordings.setOnClickListener {
-            val selectedItems = getSelectedItems()
-            val shareText = selectedItems.joinToString(", ")
-            val shareIntent = android.content.Intent().apply {
-                action = android.content.Intent.ACTION_SEND
-                putExtra(android.content.Intent.EXTRA_TEXT, shareText)
-                type = "text/plain"
+            val directory = requireContext().filesDir
+            val fileUris = getSelectedItems().map { fileName ->
+                FileProvider.getUriForFile(
+                    requireContext(),
+                    "ESmogLogger.fileprovider", // Ensure this matches the authority in your manifest
+                    File(directory,fileName)
+                )
             }
-            startActivity(android.content.Intent.createChooser(shareIntent, "Share items"))
+            val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "text/plain" // MIME type for text files
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(fileUris))
+                putExtra(Intent.EXTRA_SUBJECT, "Sharing Multiple Recordings")
+                putExtra(Intent.EXTRA_TEXT, "Here are the Recordings I want to share with you.")
+                // Grant read permission to the receiving app
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(android.content.Intent.createChooser(shareIntent, "Share Recordings"))
             clearSelections()
         }
 
