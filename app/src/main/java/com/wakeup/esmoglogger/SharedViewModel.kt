@@ -31,7 +31,7 @@ class SharedViewModel: ViewModel() {
     // Location and ESmog queue
     private val _mapViewDataQueue = MutableSharedFlow<MapViewData>(
         replay = 0, // No replay for new subscribers
-        extraBufferCapacity = 1000, // Large buffer to handle high-frequency data
+        extraBufferCapacity = 10000, // Large buffer to handle high-frequency data
         onBufferOverflow = BufferOverflow.SUSPEND // Suspend emitter if buffer is full
     )
     val mapViewDataQueue = _mapViewDataQueue.asSharedFlow()
@@ -40,15 +40,19 @@ class SharedViewModel: ViewModel() {
     // Latest values
     private val _esmogQueue = MutableSharedFlow<ESmog>(
         replay = 0, // No replay for new subscribers
-        extraBufferCapacity = 1000, // Large buffer to handle high-frequency data
+        extraBufferCapacity = 10000, // Large buffer to handle high-frequency data
         onBufferOverflow = BufferOverflow.SUSPEND // Suspend emitter if buffer is full
     )
     val esmogQueue = _esmogQueue.asSharedFlow()
     private val _esmog = MutableLiveData<ESmog>()
     val esmog: LiveData<ESmog> get() = _esmog
     private var lastESmogPos = 0
+
+    private val _locationValid = MutableLiveData<Boolean>()
+    val locationValid: LiveData<Boolean> get() = _locationValid
     private val _location = MutableLiveData<GpsLocation>()
     val location: LiveData<GpsLocation> get() = _location
+
     // DataSeries
     val recordings: MutableList<Recording> = mutableListOf()
     var recording = Recording()
@@ -103,20 +107,22 @@ class SharedViewModel: ViewModel() {
         }
     }
 
+    fun setLocationValid(enabled: Boolean) {
+        _locationValid.value = enabled
+    }
+
     fun addLocation(location: Location) {
         val dt = Duration.between(recording.startTime, LocalDateTime.now()).toMillis().toFloat() / 1000f
         _location.postValue(GpsLocation(dt, location.latitude, location.longitude, location.altitude))
         viewModelScope.launch {
             var cnt = recording.data.size - lastESmogPos
             if (cnt > 0) {
-                println("GPS ${recording.data.size} $cnt (${location.latitude} ${location.longitude} ${location.altitude})")
                 val refValue = recording.data[lastESmogPos]!!.copy()
                 _mapViewDataQueue.emit(MapViewData(refValue, false))
                 val dLatitude = (location.latitude - refValue.latitude) / cnt
                 val dLongitude = (location.longitude - refValue.longitude) / cnt
                 val dAltitude = (location.altitude - refValue.altitude) / cnt
                 val moving = dLatitude != 0.0 || dLongitude != 0.0 || dAltitude != 0.0
-                println("# $lastESmogPos: $refValue")
                 var maxLevel = refValue.level
                 var pos = 0
                 while (cnt > 2) {
@@ -129,7 +135,6 @@ class SharedViewModel: ViewModel() {
                     value.altitude = refValue.altitude + dAltitude * pos
                     recording.data[lastESmogPos] = value
                     if (moving) {
-                        println("*$pos $cnt $lastESmogPos: $value")
                         _mapViewDataQueue.emit(MapViewData(value, false))
                     } else {
                         maxLevel = max(value.level, maxLevel)
@@ -142,7 +147,6 @@ class SharedViewModel: ViewModel() {
                     value.longitude = location.longitude
                     value.altitude = location.altitude
                     recording.data[lastESmogPos] = value
-                    println("= $lastESmogPos: $value")
                     if (!moving) {
                         value = value.copy()
                         value.level = max(value.level, maxLevel)

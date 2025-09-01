@@ -10,10 +10,14 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.google.android.material.button.MaterialButton
 import com.wakeup.esmoglogger.R
 import com.wakeup.esmoglogger.SharedViewModel
+import com.wakeup.esmoglogger.buttonSetEnabled
 import com.wakeup.esmoglogger.data.ESmogAndLocation
 import kotlinx.coroutines.launch
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -25,16 +29,26 @@ import com.wakeup.esmoglogger.getLevelColor
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.buffer
+import org.osmdroid.api.IGeoPoint
 import org.osmdroid.config.Configuration
 import org.osmdroid.util.BoundingBox
+import org.osmdroid.views.overlay.compass.CompassOverlay
+import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
 
 data class MapViewData(val value: ESmogAndLocation, val new: Boolean)
 
 class MapViewFragment : Fragment() {
     private val viewModel: SharedViewModel by activityViewModels()
     private lateinit var mapView: MapView
-    private val pathSegments = mutableListOf<Polyline>()
+    private lateinit var compassOverlay: CompassOverlay
     private lateinit var currentLocationMarker: Marker
+    private val pathSegments = mutableListOf<Polyline>()
+    private var delayedInvalidate: Job? = null
+    private val _curLocation = MutableLiveData<GeoPoint>()
+    private val curLocation: LiveData<GeoPoint> get() = _curLocation
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -49,6 +63,11 @@ class MapViewFragment : Fragment() {
         mapView.setMultiTouchControls(true)
         mapView.controller.setZoom(viewModel.mapViewZoom)
         mapView.controller.setCenter(GeoPoint(48.2035, 15.6233)) // Set initial location St. Pölten
+
+        // Add CompassOverlay
+        compassOverlay = CompassOverlay(requireContext(), InternalCompassOrientationProvider(requireContext()), mapView)
+        compassOverlay.enableCompass()
+        mapView.overlays.add(compassOverlay)
 
         // Initialize marker for current location
         currentLocationMarker = Marker(mapView)
@@ -65,6 +84,22 @@ class MapViewFragment : Fragment() {
             }
         }
 
+        val buttonRecenter = view.findViewById<MaterialButton>(R.id.button_map_recenter)
+        buttonSetEnabled(buttonRecenter, false)
+
+        viewModel.locationValid.observe(viewLifecycleOwner) {
+            buttonSetEnabled(buttonRecenter, it)
+        }
+
+        buttonRecenter.setOnClickListener {
+            if (viewModel.location.isInitialized) {
+                val position = viewModel.location.value
+                mapView.controller.setCenter(GeoPoint(position?.latitude!!,
+                    position.longitude
+                ))
+            }
+        }
+
         return view
     }
 
@@ -73,7 +108,7 @@ class MapViewFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.mapViewDataQueue.collect { data ->
+                viewModel.mapViewDataQueue.buffer(10000).collect { data ->
                     val geoPoint = GeoPoint(data.value.latitude, data.value.longitude)
                     val color = if (data.value.frequency == 0) {
                         Color.GRAY
@@ -91,9 +126,18 @@ class MapViewFragment : Fragment() {
                         mapView.overlays.add(newPath)
                     }
                     pathSegments.last().addPoint(geoPoint) // Add new point to the path
-                    mapView.controller.setCenter(geoPoint) // Center map on current location
-                    currentLocationMarker.position = geoPoint
-                    mapView.invalidate() // Refresh map to show updated path
+                    _curLocation.value = geoPoint
+                    if (delayedInvalidate == null) {
+                        delayedInvalidate = launch(Dispatchers.Main) {
+                            delay(100)
+                            curLocation.value.let {
+                                mapView.controller.setCenter(it) // Center map on current location
+                                currentLocationMarker.position = it
+                            }
+                            mapView.invalidate() // Refresh map to show updated path
+                            delayedInvalidate = null
+                        }
+                    }
                 }
             }
         }

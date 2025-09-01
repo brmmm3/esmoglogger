@@ -75,7 +75,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Setup USB serial communication
-        SharedLogData.addLog("Setup Serial")
         serial = SerialCommunication(this)
         SharedSerialData.command.observe(this) { command ->
             if (command) {
@@ -92,6 +91,7 @@ class MainActivity : AppCompatActivity() {
 
         locationHandler = LocationHandler(this) { location ->
             viewModel.addLocation(location)
+            viewModel.setLocationValid(true)
         }
 
         viewModel.gps.observe(this) { enabled ->
@@ -99,6 +99,7 @@ class MainActivity : AppCompatActivity() {
                 locationHandler.initialize()
                 locationHandler.resume()
             } else {
+                viewModel.setLocationValid(false)
                 locationHandler.pause()
             }
         }
