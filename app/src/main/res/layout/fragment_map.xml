@@ -12,19 +12,43 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/button_map_recenter"
-            android:layout_width="wrap_content"
-            android:layout_height="54dp"
-            android:layout_marginEnd="8dp"
-            app:icon="@drawable/button_gps"
-            app:iconGravity="textStart"
-            app:iconTint="@null" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_map_recenter"
+                android:layout_width="wrap_content"
+                android:layout_height="54dp"
+                android:layout_marginEnd="8dp"
+                app:icon="@drawable/button_gps"
+                app:iconGravity="textStart"
+                app:iconTint="@null" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_map_switch_view"
+                android:layout_width="wrap_content"
+                android:layout_height="54dp"
+                android:layout_marginEnd="8dp"
+                app:icon="@drawable/split_vertical_32p"
+                app:iconGravity="textStart"
+                app:iconTint="@null" />
+
+        </LinearLayout>
 
         <org.osmdroid.views.MapView
-            android:id="@+id/map"
+            android:id="@+id/map_view"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/map_line_chart"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:visibility="visible" />
 
     </LinearLayout>
 

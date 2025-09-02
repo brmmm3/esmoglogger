@@ -1,12 +1,20 @@
 package com.wakeup.esmoglogger.ui.mapview
 
+import MapAlignedCompassOverlay
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.graphics.Color
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
@@ -14,6 +22,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.github.mikephil.charting.charts.LineChart
 import com.google.android.material.button.MaterialButton
 import com.wakeup.esmoglogger.R
 import com.wakeup.esmoglogger.SharedViewModel
@@ -26,6 +35,7 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import com.wakeup.esmoglogger.getLevelColor
+import com.wakeup.esmoglogger.ui.chartview.LineChartManager
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -37,18 +47,54 @@ import org.osmdroid.config.Configuration
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.views.overlay.compass.CompassOverlay
 import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
+import androidx.core.view.isGone
+import com.wakeup.esmoglogger.data.ESmog
+import org.osmdroid.views.overlay.gestures.RotationGestureOverlay
+import kotlin.math.abs
 
 data class MapViewData(val value: ESmogAndLocation, val new: Boolean)
 
 class MapViewFragment : Fragment() {
     private val viewModel: SharedViewModel by activityViewModels()
     private lateinit var mapView: MapView
-    private lateinit var compassOverlay: CompassOverlay
+    private lateinit var sensorManager: SensorManager
+    private var orientationSensor: Sensor? = null
+    private var currentHeading = 0f
+    private val rotationMatrix = FloatArray(9)
+    private val orientationAngles = FloatArray(3)
+    private lateinit var compassOverlay: MapAlignedCompassOverlay
     private lateinit var currentLocationMarker: Marker
     private val pathSegments = mutableListOf<Polyline>()
+    private val esmog = mutableListOf<ESmog>()
     private var delayedInvalidate: Job? = null
     private val _curLocation = MutableLiveData<GeoPoint>()
     private val curLocation: LiveData<GeoPoint> get() = _curLocation
+
+    private lateinit var lineChart: LineChart
+    private var chartManager: LineChartManager? = null
+
+    private val sensorEventListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
+                // Get rotation matrix and orientation angles
+                SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+                SensorManager.getOrientation(rotationMatrix, orientationAngles)
+                var heading = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
+                if (heading < 0) heading += 360f
+
+                // Smooth heading to reduce jitter
+                if (abs(currentHeading - heading) > 1f) {
+                    currentHeading = smoothHeading(heading, currentHeading)
+                    mapView.mapOrientation = -currentHeading // Negative to align with direction
+                    mapView.invalidate()
+                }
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
+            // Handle accuracy changes if needed
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -57,17 +103,44 @@ class MapViewFragment : Fragment() {
         val view = inflater.inflate(R.layout.fragment_map, container, false)
 
         // Initialize MapView
-        mapView = view.findViewById(R.id.map)
+        mapView = view.findViewById(R.id.map_view)
         mapView.setTileSource(TileSourceFactory.MAPNIK)
         mapView.setUseDataConnection(true) // Allow downloading tiles when online
         mapView.setMultiTouchControls(true)
         mapView.controller.setZoom(viewModel.mapViewZoom)
         mapView.controller.setCenter(GeoPoint(48.2035, 15.6233)) // Set initial location St. Pölten
 
+        // Enable rotation gestures
+        val rotationGestureOverlay = RotationGestureOverlay(mapView)
+        rotationGestureOverlay.isEnabled = true
+        mapView.overlays.add(rotationGestureOverlay)
+
         // Add CompassOverlay
-        compassOverlay = CompassOverlay(requireContext(), InternalCompassOrientationProvider(requireContext()), mapView)
+        compassOverlay = MapAlignedCompassOverlay(requireContext(), InternalCompassOrientationProvider(requireContext()), mapView)
         compassOverlay.enableCompass()
         mapView.overlays.add(compassOverlay)
+
+        // Handle compass tap to reset orientation
+        mapView.setOnTouchListener { _, event ->
+            if (event.action == MotionEvent.ACTION_UP) {
+                val x = event.x
+                val y = event.y
+                val compassBounds = compassOverlay.getCompassBounds()
+                if (compassBounds.contains(x, y)) {
+                    mapView.mapOrientation = 0f
+                    mapView.invalidate()
+                    true // Consume the touch event
+                } else {
+                    false // Let other listeners handle the event
+                }
+            } else {
+                false
+            }
+        }
+
+        // Initialize SensorManager
+        sensorManager = context?.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        orientationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
 
         // Initialize marker for current location
         currentLocationMarker = Marker(mapView)
@@ -84,6 +157,7 @@ class MapViewFragment : Fragment() {
             }
         }
 
+        // Recenter Button
         val buttonRecenter = view.findViewById<MaterialButton>(R.id.button_map_recenter)
         buttonSetEnabled(buttonRecenter, false)
 
@@ -100,6 +174,32 @@ class MapViewFragment : Fragment() {
             }
         }
 
+        // Split view Button
+        val buttonSplitView = view.findViewById<MaterialButton>(R.id.button_map_switch_view)
+
+        buttonSplitView.setOnClickListener {
+            if (lineChart.isGone) {
+                lineChart.visibility = View.VISIBLE
+            } else {
+                lineChart.visibility = View.GONE
+            }
+        }
+
+        // Initialize line chart
+        lineChart = view.findViewById(R.id.map_line_chart)
+        chartManager = LineChartManager(lineChart, false)
+        chartManager?.showLevelData(true)
+        chartManager?.showFrequencyData(false)
+        lineChart.visibility = View.GONE
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.esmogQueue.collect { value ->
+                    chartManager?.addChartPt(value.time, value.level, value.frequency)
+                }
+            }
+        }
+
         return view
     }
 
@@ -109,6 +209,7 @@ class MapViewFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.mapViewDataQueue.buffer(10000).collect { data ->
+                    esmog.add(ESmog(data.value.time, data.value.level, data.value.frequency))
                     val geoPoint = GeoPoint(data.value.latitude, data.value.longitude)
                     val color = if (data.value.frequency == 0) {
                         Color.GRAY
@@ -179,12 +280,30 @@ class MapViewFragment : Fragment() {
         super.onResume()
         Configuration.getInstance().load(requireContext(), requireContext().getSharedPreferences("osmdroid", MODE_PRIVATE))
         mapView.onResume()
+        orientationSensor?.let {
+            sensorManager.registerListener(
+                sensorEventListener,
+                it,
+                SensorManager.SENSOR_DELAY_UI
+            )
+        } ?: run {
+            Toast.makeText(requireContext(), "Orientation sensor not available", Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onPause() {
         super.onPause()
         Configuration.getInstance().save(requireContext(), requireContext().getSharedPreferences("osmdroid", MODE_PRIVATE))
         mapView.onPause()
+        sensorManager.unregisterListener(sensorEventListener)
+    }
+
+    private fun smoothHeading(newHeading: Float, currentHeading: Float): Float {
+        val alpha = 0.1f // Smoothing factor (0 to 1, lower = smoother)
+        var delta = newHeading - currentHeading
+        if (delta > 180) delta -= 360
+        else if (delta < -180) delta += 360
+        return currentHeading + alpha * delta
     }
 
     @OptIn(DelicateCoroutinesApi::class)
@@ -211,5 +330,20 @@ class MapViewFragment : Fragment() {
                 }
             }
         }
+    }
+
+    fun getVisibleESmog(): List<ESmog> {
+        val boundingBox = mapView.boundingBox
+        val visibleESmog = mutableListOf<ESmog>()
+        var index = 0
+        for (pathSegment in pathSegments) {
+            for (point in pathSegment.points)  {
+                if (boundingBox.contains(point)) {
+                    visibleESmog.add(esmog[index])
+                }
+                index++
+            }
+        }
+        return visibleESmog
     }
 }
