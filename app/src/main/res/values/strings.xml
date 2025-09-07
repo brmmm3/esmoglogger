@@ -3,7 +3,7 @@
     <string name="title_home">ESmogLogger V1.0</string>
     <string name="title_chart">Chart</string>
     <string name="title_settings">Settings</string>
-    <string name="title_log">Log</string>
+    <string name="title_cloud">Cloud</string>
     <string name="main_menu_title">Main menu</string>
     <string name="main_menu_reset_zoom">Reset zoom</string>
     <string name="main_menu_set_notes">Set notes</string>

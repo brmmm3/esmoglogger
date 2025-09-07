@@ -4,7 +4,13 @@ import MapAlignedCompassOverlay
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -15,6 +21,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
@@ -26,7 +33,6 @@ import com.github.mikephil.charting.charts.LineChart
 import com.google.android.material.button.MaterialButton
 import com.wakeup.esmoglogger.R
 import com.wakeup.esmoglogger.SharedViewModel
-import com.wakeup.esmoglogger.buttonSetEnabled
 import com.wakeup.esmoglogger.data.ESmogAndLocation
 import kotlinx.coroutines.launch
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -42,19 +48,25 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.buffer
-import org.osmdroid.api.IGeoPoint
 import org.osmdroid.config.Configuration
 import org.osmdroid.util.BoundingBox
-import org.osmdroid.views.overlay.compass.CompassOverlay
 import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
 import androidx.core.view.isGone
 import com.wakeup.esmoglogger.data.ESmog
+import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
+import org.osmdroid.views.overlay.MapEventsOverlay
+import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.gestures.RotationGestureOverlay
 import kotlin.math.abs
+import androidx.core.graphics.withSave
 
 data class MapViewData(val value: ESmogAndLocation, val new: Boolean)
 
 class MapViewFragment : Fragment() {
+    private val TAG = "MapViewFragment"
     private val viewModel: SharedViewModel by activityViewModels()
     private lateinit var mapView: MapView
     private lateinit var sensorManager: SensorManager
@@ -64,9 +76,14 @@ class MapViewFragment : Fragment() {
     private val orientationAngles = FloatArray(3)
     private lateinit var compassOverlay: MapAlignedCompassOverlay
     private lateinit var currentLocationMarker: Marker
+    private var isGpsLocationEnabled = true
+    private var isCompassRotationEnabled = true
+    private var lastCenter: GeoPoint? = null
+    private var lastOrientation: Float = 0f
     private val pathSegments = mutableListOf<Polyline>()
     private val esmog = mutableListOf<ESmog>()
     private var delayedInvalidate: Job? = null
+
     private val _curLocation = MutableLiveData<GeoPoint>()
     private val curLocation: LiveData<GeoPoint> get() = _curLocation
 
@@ -85,8 +102,10 @@ class MapViewFragment : Fragment() {
                 // Smooth heading to reduce jitter
                 if (abs(currentHeading - heading) > 1f) {
                     currentHeading = smoothHeading(heading, currentHeading)
-                    mapView.mapOrientation = -currentHeading // Negative to align with direction
-                    mapView.invalidate()
+                    if (isGpsLocationEnabled && isCompassRotationEnabled) {
+                        mapView.mapOrientation = -currentHeading // Negative to align with direction
+                        mapView.invalidate()
+                    }
                 }
             }
         }
@@ -120,6 +139,23 @@ class MapViewFragment : Fragment() {
         compassOverlay.enableCompass()
         mapView.overlays.add(compassOverlay)
 
+        // Add MapEventsOverlay for tap detection
+        val mapEventsOverlay = MapEventsOverlay(object : MapEventsReceiver {
+            override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
+                p ?: return false
+                if (!pathSegments.isEmpty()) {
+                    val closestPoint = pathSegments.first().points.minByOrNull { it.distanceToAsDouble(p) }
+                    return true
+                }
+                return false
+            }
+
+            override fun longPressHelper(p: GeoPoint?): Boolean {
+                return false // Not used
+            }
+        })
+        mapView.overlays.add(0, mapEventsOverlay)
+
         // Handle compass tap to reset orientation
         mapView.setOnTouchListener { _, event ->
             if (event.action == MotionEvent.ACTION_UP) {
@@ -127,7 +163,12 @@ class MapViewFragment : Fragment() {
                 val y = event.y
                 val compassBounds = compassOverlay.getCompassBounds()
                 if (compassBounds.contains(x, y)) {
-                    mapView.mapOrientation = 0f
+                    if (isCompassRotationEnabled) {
+                        isCompassRotationEnabled = false
+                        mapView.mapOrientation = 0f
+                    } else {
+                        isCompassRotationEnabled = true
+                    }
                     mapView.invalidate()
                     true // Consume the touch event
                 } else {
@@ -137,6 +178,30 @@ class MapViewFragment : Fragment() {
                 false
             }
         }
+
+        addCenterToCurrentLocationButton()
+        addTextOverlay()
+
+        // Add MapListener to detect panning and rotation
+        mapView.addMapListener(object : MapListener {
+            override fun onScroll(event: ScrollEvent): Boolean {
+                val newCenter = mapView.mapCenter as GeoPoint
+                if (lastCenter == null || newCenter.distanceToAsDouble(lastCenter!!) > 10.0) { // Threshold to avoid noise
+                    lastCenter = GeoPoint(newCenter.latitude, newCenter.longitude)
+                }
+                isGpsLocationEnabled = false
+                return true
+            }
+
+            override fun onZoom(event: ZoomEvent): Boolean {
+                val newOrientation = mapView.mapOrientation
+                if (abs(newOrientation - lastOrientation) > 1f) { // Threshold to avoid noise
+                    lastOrientation = newOrientation
+                    isCompassRotationEnabled = false
+                }
+                return true
+            }
+        })
 
         // Initialize SensorManager
         sensorManager = context?.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -154,23 +219,6 @@ class MapViewFragment : Fragment() {
                 onResume()
             } else {
                 onPause()
-            }
-        }
-
-        // Recenter Button
-        val buttonRecenter = view.findViewById<MaterialButton>(R.id.button_map_recenter)
-        buttonSetEnabled(buttonRecenter, false)
-
-        viewModel.locationValid.observe(viewLifecycleOwner) {
-            buttonSetEnabled(buttonRecenter, it)
-        }
-
-        buttonRecenter.setOnClickListener {
-            if (viewModel.location.isInitialized) {
-                val position = viewModel.location.value
-                mapView.controller.setCenter(GeoPoint(position?.latitude!!,
-                    position.longitude
-                ))
             }
         }
 
@@ -298,12 +346,119 @@ class MapViewFragment : Fragment() {
         sensorManager.unregisterListener(sensorEventListener)
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        mapView.onDetach()
+    }
     private fun smoothHeading(newHeading: Float, currentHeading: Float): Float {
         val alpha = 0.1f // Smoothing factor (0 to 1, lower = smoother)
         var delta = newHeading - currentHeading
         if (delta > 180) delta -= 360
         else if (delta < -180) delta += 360
         return currentHeading + alpha * delta
+    }
+
+    private fun addCenterToCurrentLocationButton() {
+        val iconDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.location_green_32p)
+        val iconWidth = 100 // Adjust size as needed
+        val iconHeight = 100 // Adjust size as needed
+        val margin = 20 // Margin from top-right corner
+
+        val overlay = object : Overlay() {
+            override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+                if (shadow) return // Skip shadow layer
+                iconDrawable?.let {
+                    canvas.withSave {
+                        // Get map rotation and apply inverse rotation to keep icon orientation fixed
+                        val rotation = mapView.mapOrientation
+                        rotate(-rotation, mapView.width / 2f, mapView.height / 2f)
+                        it.setBounds(
+                            mapView.width - iconWidth - margin,
+                            margin,
+                            mapView.width - margin,
+                            margin + iconHeight
+                        )
+                        if (viewModel.location.isInitialized) {
+                            if (!isGpsLocationEnabled) {
+                                val colorMatrix = ColorMatrix(floatArrayOf(
+                                    0f, 1f, 0f, 0f, 0f, // Red: keep red
+                                    0f, 1f, 0f, 0f, 0f, // Green: map green to red
+                                    0f, 0f, 1f, 0f, 0f, // Blue: keep blue
+                                    0f, 0f, 0f, 1f, 0f  // Alpha: keep alpha
+                                ))
+                                it.colorFilter = ColorMatrixColorFilter(colorMatrix)
+                            } else {
+                                it.colorFilter = null
+                            }
+                        } else {
+                            // Apply grayscale filter to the drawable
+                            val colorMatrix = ColorMatrix()
+                            colorMatrix.setSaturation(0f) // Set saturation to 0 for grayscale
+                            it.colorFilter = ColorMatrixColorFilter(colorMatrix)
+                        }
+                        it.draw(this)
+                    }
+                }
+            }
+
+            override fun onSingleTapConfirmed(e: MotionEvent, mapView: MapView): Boolean {
+                iconDrawable?.let {
+                    // Adjust click coordinates for map rotation
+                    val rotation = mapView.mapOrientation
+                    val matrix = Matrix()
+                    matrix.postRotate(-rotation, mapView.width / 2f, mapView.height / 2f)
+                    // Invert the matrix to map screen coordinates to the unrotated space
+                    val inverseMatrix = Matrix()
+                    matrix.invert(inverseMatrix)
+
+                    // Transform the touch point
+                    val point = floatArrayOf(e.x, e.y)
+                    inverseMatrix.mapPoints(point)
+
+                    val bounds = it.bounds
+                    if (point[0] >= bounds.left && point[0] <= bounds.right &&
+                        point[1] >= bounds.top && point[1] <= bounds.bottom) {
+                        if (viewModel.location.isInitialized) {
+                            isGpsLocationEnabled = true
+                            val position = viewModel.location.value
+                            mapView.controller.setCenter(GeoPoint(position?.latitude!!,
+                                position.longitude
+                            ))
+                        }
+                        return true
+                    }
+                }
+                return false
+            }
+        }
+        mapView.overlays.add(overlay)
+        mapView.invalidate()
+    }
+
+    private fun addTextOverlay() {
+        val paint = Paint().apply {
+            color = Color.BLACK // Text color
+            textSize = 80f // Text size in pixels
+            isAntiAlias = true // Smooth edges
+            textAlign = Paint.Align.RIGHT // Align text to the left
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        paint.setShadowLayer(4f, 2f, 2f, Color.BLACK)
+        val margin = 20f
+
+        val overlay = object : Overlay() {
+            override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+                if (shadow) return // Skip if shadow
+                canvas.withSave {
+                    // Apply inverse rotation to keep text orientation fixed
+                    val rotation = mapView.mapOrientation
+                    rotate(-rotation, mapView.width / 2f, mapView.height / 2f)
+                    drawText("HELLOHELLOHELLO", mapView.width - margin, mapView.height - margin, paint)
+                }
+            }
+        }
+        mapView.overlays.add(overlay)
+        mapView.invalidate()
     }
 
     @OptIn(DelicateCoroutinesApi::class)

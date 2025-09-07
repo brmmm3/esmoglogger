@@ -1,4 +1,4 @@
-package com.wakeup.esmoglogger.ui.log
+package com.wakeup.esmoglogger.ui.cloud
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -9,15 +9,15 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.wakeup.esmoglogger.R
 
-class LogFragment : Fragment() {
+class CloudFragment : Fragment() {
     private var recyclerView: RecyclerView? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
-        val view = inflater.inflate(R.layout.fragment_log, container, false)
-        recyclerView = view.findViewById<RecyclerView?>(R.id.logView)
+        val view = inflater.inflate(R.layout.fragment_cloud, container, false)
+        recyclerView = view.findViewById<RecyclerView?>(R.id.cloud_view)
         recyclerView?.layoutManager = LinearLayoutManager(this.context)
         val adapter = LogAdapter(emptyList())
         recyclerView?.adapter = adapter

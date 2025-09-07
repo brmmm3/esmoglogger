@@ -18,7 +18,6 @@ import com.wakeup.esmoglogger.databinding.ActivityMainBinding
 import com.wakeup.esmoglogger.location.LocationHandler
 import com.wakeup.esmoglogger.serialcommunication.SerialCommunication
 import com.wakeup.esmoglogger.serialcommunication.SharedSerialData
-import com.wakeup.esmoglogger.ui.log.SharedLogData
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.osmdroid.config.Configuration
@@ -60,7 +59,7 @@ class MainActivity : AppCompatActivity() {
         // Passing each menu ID as a set of Ids because each
         // menu should be considered as top level destinations.
         val appBarConfiguration = AppBarConfiguration.Builder(
-            R.id.navigation_home, R.id.navigation_chart, R.id.navigation_map, R.id.navigation_log
+            R.id.navigation_home, R.id.navigation_chart, R.id.navigation_cloud, R.id.navigation_map
         ).build()
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment_activity_main) as NavHostFragment

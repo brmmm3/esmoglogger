@@ -11,7 +11,7 @@ import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
 import com.wakeup.esmoglogger.isEmulator
-import com.wakeup.esmoglogger.ui.log.SharedLogData
+import com.wakeup.esmoglogger.ui.cloud.SharedLogData
 import java.io.InputStream
 import java.net.Socket
 import kotlin.random.Random

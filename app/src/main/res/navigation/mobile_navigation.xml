@@ -24,14 +24,14 @@
         tools:layout="@layout/fragment_map" />
 
     <fragment
+        android:id="@+id/navigation_cloud"
+        android:name="com.wakeup.esmoglogger.ui.cloud.CloudFragment"
+        android:label="@string/title_cloud"
+        tools:layout="@layout/fragment_cloud" />
+
+    <fragment
         android:id="@+id/navigation_settings"
         android:name="com.wakeup.esmoglogger.ui.settings.SettingsFragment"
         android:label="Settings"
         tools:layout="@layout/fragment_settings" />
-
-    <fragment
-        android:id="@+id/navigation_log"
-        android:name="com.wakeup.esmoglogger.ui.log.LogFragment"
-        android:label="@string/title_log"
-        tools:layout="@layout/fragment_log" />
 </navigation>

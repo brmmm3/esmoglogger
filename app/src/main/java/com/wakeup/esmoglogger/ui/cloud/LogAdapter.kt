@@ -1,4 +1,4 @@
-package com.wakeup.esmoglogger.ui.log
+package com.wakeup.esmoglogger.ui.cloud
 
 import android.view.LayoutInflater
 import android.view.View
