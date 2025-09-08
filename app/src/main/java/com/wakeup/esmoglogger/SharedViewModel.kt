@@ -52,10 +52,10 @@ class SharedViewModel: ViewModel() {
     val locationValid: LiveData<Boolean> get() = _locationValid
     private val _location = MutableLiveData<GpsLocation>()
     val location: LiveData<GpsLocation> get() = _location
-
     // DataSeries
     val recordings: MutableList<Recording> = mutableListOf()
     var recording = Recording()
+    var startTime: LocalDateTime = LocalDateTime.now()
 
     fun startGps() {
         _gps.value = true

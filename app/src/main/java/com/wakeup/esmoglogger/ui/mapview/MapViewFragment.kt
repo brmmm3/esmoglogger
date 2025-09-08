@@ -30,7 +30,6 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.github.mikephil.charting.charts.LineChart
-import com.google.android.material.button.MaterialButton
 import com.wakeup.esmoglogger.R
 import com.wakeup.esmoglogger.SharedViewModel
 import com.wakeup.esmoglogger.data.ESmogAndLocation
@@ -62,6 +61,15 @@ import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.gestures.RotationGestureOverlay
 import kotlin.math.abs
 import androidx.core.graphics.withSave
+import java.time.Duration
+import java.time.LocalDateTime
+import kotlin.math.PI
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.sin
+import kotlin.math.sqrt
+import androidx.core.view.isVisible
 
 data class MapViewData(val value: ESmogAndLocation, val new: Boolean)
 
@@ -76,12 +84,17 @@ class MapViewFragment : Fragment() {
     private val orientationAngles = FloatArray(3)
     private lateinit var compassOverlay: MapAlignedCompassOverlay
     private lateinit var currentLocationMarker: Marker
-    private var isGpsLocationEnabled = true
+    private var tapPositionMarker: Marker? = null
     private var isCompassRotationEnabled = true
+    private var lastLevel = 0f
     private var lastCenter: GeoPoint? = null
     private var lastOrientation: Float = 0f
+    private var lastLocationTime: LocalDateTime = LocalDateTime.now()
+    private var lastLocation: GeoPoint? = null
+    private var distance = 0f // m
+    private var speed = 0f // m/s
     private val pathSegments = mutableListOf<Polyline>()
-    private val esmog = mutableListOf<ESmog>()
+    private val esmogAndLocation = mutableListOf<ESmogAndLocation>()
     private var delayedInvalidate: Job? = null
 
     private val _curLocation = MutableLiveData<GeoPoint>()
@@ -102,7 +115,7 @@ class MapViewFragment : Fragment() {
                 // Smooth heading to reduce jitter
                 if (abs(currentHeading - heading) > 1f) {
                     currentHeading = smoothHeading(heading, currentHeading)
-                    if (isGpsLocationEnabled && isCompassRotationEnabled) {
+                    if (isCompassRotationEnabled) {
                         mapView.mapOrientation = -currentHeading // Negative to align with direction
                         mapView.invalidate()
                     }
@@ -143,11 +156,34 @@ class MapViewFragment : Fragment() {
         val mapEventsOverlay = MapEventsOverlay(object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
                 p ?: return false
-                if (!pathSegments.isEmpty()) {
-                    val closestPoint = pathSegments.first().points.minByOrNull { it.distanceToAsDouble(p) }
-                    return true
+                if (viewModel.isRecording.value == true || pathSegments.isEmpty()) {
+                    if (tapPositionMarker != null) {
+                        mapView.overlays.remove(tapPositionMarker)
+                        tapPositionMarker = null
+                    }
+                    return false
                 }
-                return false
+                val combinedPoints = mutableListOf<GeoPoint>().apply {
+                    for (pathSegment in pathSegments) {
+                        addAll(pathSegment.points)
+                    }
+                }
+                val closestPoint = combinedPoints.minByOrNull { it.distanceToAsDouble(p) }
+                val distance = closestPoint?.distanceToAsDouble(p)
+                if (tapPositionMarker == null && distance!! <= 50.0) {
+                    tapPositionMarker = Marker(mapView)
+                    tapPositionMarker?.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    mapView.overlays.add(tapPositionMarker)
+                } else distance?.let {
+                    if (it > 50.0) {
+                        mapView.overlays.remove(tapPositionMarker)
+                        tapPositionMarker = null
+                    }
+                }
+                if (tapPositionMarker != null) {
+                    tapPositionMarker?.position = closestPoint
+                }
+                return true
             }
 
             override fun longPressHelper(p: GeoPoint?): Boolean {
@@ -179,7 +215,7 @@ class MapViewFragment : Fragment() {
             }
         }
 
-        addCenterToCurrentLocationButton()
+        addSplitViewbutton()
         addTextOverlay()
 
         // Add MapListener to detect panning and rotation
@@ -189,7 +225,13 @@ class MapViewFragment : Fragment() {
                 if (lastCenter == null || newCenter.distanceToAsDouble(lastCenter!!) > 10.0) { // Threshold to avoid noise
                     lastCenter = GeoPoint(newCenter.latitude, newCenter.longitude)
                 }
-                isGpsLocationEnabled = false
+                if (viewModel.isRecording.value != true && lineChart.isVisible) {
+                    chartManager?.clear()
+                    for (value in getVisibleESmogAndLocation()) {
+                        chartManager?.addChartPt(value.time, value.level, value.frequency)
+                    }
+                }
+                isCompassRotationEnabled = false
                 return true
             }
 
@@ -222,17 +264,6 @@ class MapViewFragment : Fragment() {
             }
         }
 
-        // Split view Button
-        val buttonSplitView = view.findViewById<MaterialButton>(R.id.button_map_switch_view)
-
-        buttonSplitView.setOnClickListener {
-            if (lineChart.isGone) {
-                lineChart.visibility = View.VISIBLE
-            } else {
-                lineChart.visibility = View.GONE
-            }
-        }
-
         // Initialize line chart
         lineChart = view.findViewById(R.id.map_line_chart)
         chartManager = LineChartManager(lineChart, false)
@@ -254,11 +285,35 @@ class MapViewFragment : Fragment() {
     @SuppressLint("DefaultLocale")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        val R = 6371000.0
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.mapViewDataQueue.buffer(10000).collect { data ->
-                    esmog.add(ESmog(data.value.time, data.value.level, data.value.frequency))
+                    if (tapPositionMarker != null) {
+                        mapView.overlays.remove(tapPositionMarker)
+                        tapPositionMarker = null
+                    }
+                    esmogAndLocation.add(ESmogAndLocation(data.value.time, data.value.level, data.value.frequency, data.value.latitude, data.value.longitude, data.value.altitude))
                     val geoPoint = GeoPoint(data.value.latitude, data.value.longitude)
+                    if (lastLocation != null) {
+                        val now = LocalDateTime.now()
+                        val dt = Duration.between(lastLocationTime, now).toNanos().toFloat() / 1000000f
+                        if (now > lastLocationTime) {
+                            lastLocationTime = now
+                        }
+                        val dLatitde: Double = abs(lastLocation?.latitude?.minus(geoPoint.latitude)!!)
+                        val dLongitude: Double = abs(lastLocation?.longitude?.minus(geoPoint.longitude)!!)
+                        val a = sin(dLatitde / 360.0 * PI).pow(2.0) + cos(lastLocation?.latitude!! / 180.0 * PI) * cos(geoPoint.latitude / 180.0 * PI) * sin(dLongitude / 360.0 * PI).pow(2.0)
+                        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+                        val curDistance = (R * c).toFloat()
+                        distance += curDistance
+                        speed = if (curDistance == 0f || dt == 0f) {
+                            0f
+                        } else {
+                            3.6f * curDistance / dt
+                        }
+                    }
+                    lastLocation = geoPoint
                     val color = if (data.value.frequency == 0) {
                         Color.GRAY
                     } else {
@@ -291,7 +346,8 @@ class MapViewFragment : Fragment() {
             }
         }
         viewModel.esmog.observe(viewLifecycleOwner) { value ->
-            currentLocationMarker.title = String.format("%6.2f mW", value.level)
+            lastLevel = value.level
+            currentLocationMarker.title = String.format("%6.2f mW", lastLevel)
             if (currentLocationMarker.isInfoWindowShown) {
                 currentLocationMarker.closeInfoWindow()
                 currentLocationMarker.showInfoWindow()
@@ -358,8 +414,8 @@ class MapViewFragment : Fragment() {
         return currentHeading + alpha * delta
     }
 
-    private fun addCenterToCurrentLocationButton() {
-        val iconDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.location_green_32p)
+    private fun addSplitViewbutton() {
+        val iconDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.split_vertical_32p)
         val iconWidth = 100 // Adjust size as needed
         val iconHeight = 100 // Adjust size as needed
         val margin = 20 // Margin from top-right corner
@@ -379,7 +435,7 @@ class MapViewFragment : Fragment() {
                             margin + iconHeight
                         )
                         if (viewModel.location.isInitialized) {
-                            if (!isGpsLocationEnabled) {
+                            if (!isCompassRotationEnabled) {
                                 val colorMatrix = ColorMatrix(floatArrayOf(
                                     0f, 1f, 0f, 0f, 0f, // Red: keep red
                                     0f, 1f, 0f, 0f, 0f, // Green: map green to red
@@ -418,12 +474,10 @@ class MapViewFragment : Fragment() {
                     val bounds = it.bounds
                     if (point[0] >= bounds.left && point[0] <= bounds.right &&
                         point[1] >= bounds.top && point[1] <= bounds.bottom) {
-                        if (viewModel.location.isInitialized) {
-                            isGpsLocationEnabled = true
-                            val position = viewModel.location.value
-                            mapView.controller.setCenter(GeoPoint(position?.latitude!!,
-                                position.longitude
-                            ))
+                        if (lineChart.isGone) {
+                            lineChart.visibility = View.VISIBLE
+                        } else {
+                            lineChart.visibility = View.GONE
                         }
                         return true
                     }
@@ -438,22 +492,53 @@ class MapViewFragment : Fragment() {
     private fun addTextOverlay() {
         val paint = Paint().apply {
             color = Color.BLACK // Text color
-            textSize = 80f // Text size in pixels
+            textSize = 60f // Text size in pixels
             isAntiAlias = true // Smooth edges
             textAlign = Paint.Align.RIGHT // Align text to the left
             typeface = Typeface.DEFAULT_BOLD
         }
         paint.setShadowLayer(4f, 2f, 2f, Color.BLACK)
-        val margin = 20f
+        val speedPaint = Paint().apply {
+            color = Color.BLACK // Text color
+            textSize = 60f // Text size in pixels
+            isAntiAlias = true // Smooth edges
+            textAlign = Paint.Align.LEFT // Align text to the left
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        speedPaint.setShadowLayer(4f, 2f, 2f, Color.BLACK)
+        val levelPaint = Paint().apply {
+            color = Color.BLACK // Text color
+            textSize = 80f // Text size in pixels
+            isAntiAlias = true // Smooth edges
+            textAlign = Paint.Align.RIGHT // Align text to the left
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        levelPaint.setShadowLayer(4f, 2f, 2f, Color.BLACK)
+
+        val xMargin = 20f
+        val yMargin = 200f
 
         val overlay = object : Overlay() {
+            @SuppressLint("DefaultLocale")
             override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
                 if (shadow) return // Skip if shadow
+                if (viewModel.isRecording.value != true) return
                 canvas.withSave {
                     // Apply inverse rotation to keep text orientation fixed
                     val rotation = mapView.mapOrientation
                     rotate(-rotation, mapView.width / 2f, mapView.height / 2f)
-                    drawText("HELLOHELLOHELLO", mapView.width - margin, mapView.height - margin, paint)
+                    val x = mapView.width - xMargin
+                    val y = mapView.height - yMargin
+                    if (lastLevel == 0f) {
+                        levelPaint.color = Color.GRAY
+                    } else {
+                        levelPaint.color = getLevelColor(lastLevel)
+                    }
+                    drawText(String.format("%6.2f mW", lastLevel), x, y, levelPaint)
+                    drawText(String.format("%6.2f km/h", speed), xMargin, y, speedPaint)
+                    drawText(String.format("%6.2f m", distance), xMargin, y - 100, speedPaint)
+                    val dt = Duration.between(viewModel.startTime, LocalDateTime.now())
+                    drawText("${dt.toMillis() / 1000} s", x, y - 100, paint)
                 }
             }
         }
@@ -487,16 +572,12 @@ class MapViewFragment : Fragment() {
         }
     }
 
-    fun getVisibleESmog(): List<ESmog> {
+    fun getVisibleESmogAndLocation(): List<ESmogAndLocation> {
         val boundingBox = mapView.boundingBox
-        val visibleESmog = mutableListOf<ESmog>()
-        var index = 0
-        for (pathSegment in pathSegments) {
-            for (point in pathSegment.points)  {
-                if (boundingBox.contains(point)) {
-                    visibleESmog.add(esmog[index])
-                }
-                index++
+        val visibleESmog = mutableListOf<ESmogAndLocation>()
+        for (value in esmogAndLocation) {
+            if (boundingBox.contains(GeoPoint(value.latitude, value.longitude))) {
+                visibleESmog.add(value)
             }
         }
         return visibleESmog
