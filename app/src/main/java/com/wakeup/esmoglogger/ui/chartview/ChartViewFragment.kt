@@ -50,8 +50,8 @@ class ChartViewFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.esmogQueue.collect { value ->
-                    chartManager?.addChartPt(value.time, value.level, value.frequency)
-                    chartManager2?.addChartPt(value.time, value.level, value.frequency)
+                    chartManager?.addChartPt(value.time, value.level, value.frequency, true)
+                    chartManager2?.addChartPt(value.time, value.level, value.frequency, true)
                 }
             }
         }

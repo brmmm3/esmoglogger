@@ -69,6 +69,7 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 import androidx.core.view.isVisible
+import kotlin.math.max
 
 data class MapViewData(val value: ESmogAndLocation, val new: Boolean)
 
@@ -274,7 +275,7 @@ class MapViewFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.esmogQueue.collect { value ->
-                    chartManager?.addChartPt(value.time, value.level, value.frequency)
+                    chartManager?.addChartPt(value.time, value.level, value.frequency, true)
                 }
             }
         }
@@ -419,10 +420,19 @@ class MapViewFragment : Fragment() {
         if (delayedChartInvalidate == null) {
             delayedChartInvalidate = viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                 delay(100)
+                val width = lineChart.viewPortHandler.contentWidth()
+                val values = getVisibleESmogAndLocation()
+                val startTime = values.first().time
+                val endTime = values.last().time
+                val dt = endTime - startTime
+                val xZoom = 100f / max(dt, 1.0f)
+                println("$width ${values.size} $startTime $endTime $dt $xZoom")
                 chartManager?.clear()
-                for (value in getVisibleESmogAndLocation()) {
-                    chartManager?.addChartPt(value.time, value.level, value.frequency)
+                for (value in values) {
+                    chartManager?.addChartPt((value.time - startTime) * xZoom, value.level, value.frequency, false)
                 }
+                chartManager?.notifyDataChanged()
+                chartManager?.resetScale()
                 delayedChartInvalidate = null
             }
         }
@@ -490,6 +500,7 @@ class MapViewFragment : Fragment() {
                         point[1] >= bounds.top && point[1] <= bounds.bottom) {
                         if (lineChart.isGone) {
                             lineChart.visibility = View.VISIBLE
+                            delayedChartUpdate()
                         } else {
                             lineChart.visibility = View.GONE
                         }

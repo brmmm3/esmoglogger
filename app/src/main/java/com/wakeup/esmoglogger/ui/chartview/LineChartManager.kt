@@ -177,7 +177,12 @@ class LineChartManager(lineChart: LineChart, customRenderer: Boolean) {
         // TODO
     }
 
-    fun addChartPt(time: Float, level: Float, frequency: Int) {
+    fun notifyDataChanged() {
+        chart.data.notifyDataChanged()
+        chart.notifyDataSetChanged()
+    }
+
+    fun addChartPt(time: Float, level: Float, frequency: Int, notify: Boolean) {
         if (chart.axisLeft.isEnabled) {
             lvlDataSet.addEntry(Entry(time, level))
             if (level > chart.axisLeft.mAxisMaximum) {
@@ -191,11 +196,14 @@ class LineChartManager(lineChart: LineChart, customRenderer: Boolean) {
                 chart.axisRight.mAxisMaximum = frequency
             }
         }
-        chart.data.notifyDataChanged()
-        chart.notifyDataSetChanged()
-        if (time > 100f) {
+        if (notify) {
+            chart.data.notifyDataChanged()
+            chart.notifyDataSetChanged()
+        }
+        val width = chart.viewPortHandler.contentWidth()
+        if (time > width) {
             //entries.removeAt(0)
-            chart.moveViewToX(time - 100f)
+            chart.moveViewToX(time - width)
         } else {
             chart.invalidate()
         }
