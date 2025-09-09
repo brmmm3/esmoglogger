@@ -51,7 +51,6 @@ import org.osmdroid.config.Configuration
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
 import androidx.core.view.isGone
-import com.wakeup.esmoglogger.data.ESmog
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
@@ -95,7 +94,8 @@ class MapViewFragment : Fragment() {
     private var speed = 0f // m/s
     private val pathSegments = mutableListOf<Polyline>()
     private val esmogAndLocation = mutableListOf<ESmogAndLocation>()
-    private var delayedInvalidate: Job? = null
+    private var delayedMapInvalidate: Job? = null
+    private var delayedChartInvalidate: Job? = null
 
     private val _curLocation = MutableLiveData<GeoPoint>()
     private val curLocation: LiveData<GeoPoint> get() = _curLocation
@@ -226,10 +226,7 @@ class MapViewFragment : Fragment() {
                     lastCenter = GeoPoint(newCenter.latitude, newCenter.longitude)
                 }
                 if (viewModel.isRecording.value != true && lineChart.isVisible) {
-                    chartManager?.clear()
-                    for (value in getVisibleESmogAndLocation()) {
-                        chartManager?.addChartPt(value.time, value.level, value.frequency)
-                    }
+                    delayedChartUpdate()
                 }
                 isCompassRotationEnabled = false
                 return true
@@ -239,6 +236,9 @@ class MapViewFragment : Fragment() {
                 val newOrientation = mapView.mapOrientation
                 if (abs(newOrientation - lastOrientation) > 1f) { // Threshold to avoid noise
                     lastOrientation = newOrientation
+                    if (viewModel.isRecording.value != true && lineChart.isVisible) {
+                        delayedChartUpdate()
+                    }
                     isCompassRotationEnabled = false
                 }
                 return true
@@ -331,15 +331,15 @@ class MapViewFragment : Fragment() {
                     }
                     pathSegments.last().addPoint(geoPoint) // Add new point to the path
                     _curLocation.value = geoPoint
-                    if (delayedInvalidate == null) {
-                        delayedInvalidate = launch(Dispatchers.Main) {
+                    if (delayedMapInvalidate == null) {
+                        delayedMapInvalidate = launch(Dispatchers.Main) {
                             delay(100)
                             curLocation.value.let {
                                 mapView.controller.setCenter(it) // Center map on current location
                                 currentLocationMarker.position = it
                             }
                             mapView.invalidate() // Refresh map to show updated path
-                            delayedInvalidate = null
+                            delayedMapInvalidate = null
                         }
                     }
                 }
@@ -406,12 +406,26 @@ class MapViewFragment : Fragment() {
         super.onDestroy()
         mapView.onDetach()
     }
+
     private fun smoothHeading(newHeading: Float, currentHeading: Float): Float {
         val alpha = 0.1f // Smoothing factor (0 to 1, lower = smoother)
         var delta = newHeading - currentHeading
         if (delta > 180) delta -= 360
         else if (delta < -180) delta += 360
         return currentHeading + alpha * delta
+    }
+
+    private fun delayedChartUpdate() {
+        if (delayedChartInvalidate == null) {
+            delayedChartInvalidate = viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+                delay(100)
+                chartManager?.clear()
+                for (value in getVisibleESmogAndLocation()) {
+                    chartManager?.addChartPt(value.time, value.level, value.frequency)
+                }
+                delayedChartInvalidate = null
+            }
+        }
     }
 
     private fun addSplitViewbutton() {
