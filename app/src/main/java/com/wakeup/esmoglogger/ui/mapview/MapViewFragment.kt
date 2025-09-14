@@ -422,14 +422,21 @@ class MapViewFragment : Fragment() {
                 delay(100)
                 val width = lineChart.viewPortHandler.contentWidth()
                 val values = getVisibleESmogAndLocation()
-                val startTime = values.first().time
-                val endTime = values.last().time
-                val dt = endTime - startTime
-                val xZoom = 100f / max(dt, 1.0f)
-                println("$width ${values.size} $startTime $endTime $dt $xZoom")
                 chartManager?.clear()
-                for (value in values) {
-                    chartManager?.addChartPt((value.time - startTime) * xZoom, value.level, value.frequency, false)
+                if (!values.isEmpty()) {
+                    val startTime = values.first().time
+                    val endTime = values.last().time
+                    val dt = endTime - startTime
+                    val xZoom = 100f / max(dt, 1.0f)
+                    println("$width ${values.size} $startTime $endTime $dt $xZoom")
+                    for (value in values) {
+                        chartManager?.addChartPt(
+                            (value.time - startTime) * xZoom,
+                            value.level,
+                            value.frequency,
+                            false
+                        )
+                    }
                 }
                 chartManager?.notifyDataChanged()
                 chartManager?.resetScale()
