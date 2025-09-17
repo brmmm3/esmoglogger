@@ -24,6 +24,12 @@
         tools:layout="@layout/fragment_map" />
 
     <fragment
+        android:id="@+id/navigation_statistics"
+        android:name="com.wakeup.esmoglogger.ui.statistics.StatisticsFragment"
+        android:label="Statistics"
+        tools:layout="@layout/fragment_statistics" />
+
+    <fragment
         android:id="@+id/navigation_cloud"
         android:name="com.wakeup.esmoglogger.ui.cloud.CloudFragment"
         android:label="@string/title_cloud"

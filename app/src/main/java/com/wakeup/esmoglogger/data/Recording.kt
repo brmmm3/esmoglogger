@@ -26,6 +26,7 @@ data class ESmogAndLocation(val time: Float,
 
 class Recording {
     var startTime: LocalDateTime = LocalDateTime.now()
+    var endTime: LocalDateTime = LocalDateTime.now()
     // Data series name
     var name = ""
     // App version
@@ -63,6 +64,10 @@ class Recording {
             return false
         }
         data = CopyOnWriteArrayList(decompressData(compressedHex!!))
+        if (endTime == startTime) {
+            // Calculate end time from number of data values. Assume 2 values per second
+            endTime.plusSeconds(data.size.toLong() / 2)
+        }
         compressedHex = null
         return true
     }
@@ -91,6 +96,7 @@ class Recording {
 
     fun stop(name: String) {
         this.name = name
+        endTime = LocalDateTime.now()
     }
 
     fun setNotes(notes: String) {
@@ -104,6 +110,7 @@ class Recording {
         jsonObject.put("device", device)
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         jsonObject.put("start", startTime.format(formatter))
+        jsonObject.put("end", endTime.format(formatter))
         jsonObject.put("count", data.size)
         jsonObject.put("has_gps", hasGps)
         if (!seriesNotes.isEmpty()) {
@@ -128,6 +135,12 @@ class Recording {
             recording.device = jsonObject.optString("device")
             val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
             recording.startTime = LocalDateTime.parse(jsonObject.get("start") as CharSequence?, formatter)
+            if (jsonObject.has("end")) {
+                recording.endTime = LocalDateTime.parse(jsonObject.get("end") as CharSequence?, formatter)
+            } else {
+                // Real end time will be written later
+                recording.endTime = recording.startTime
+            }
             recording.seriesNotes = jsonObject.optString("notes")
             recording.hasGps = jsonObject.getBoolean("has_gps")
             recording.compressedHex = jsonObject.optString("data")

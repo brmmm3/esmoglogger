@@ -19,6 +19,11 @@
         android:title="@string/title_map" />
 
     <item
+        android:id="@+id/navigation_statistics"
+        android:icon="@drawable/statistics_24p"
+        android:title="@string/statistics" />
+
+    <item
         android:id="@+id/navigation_cloud"
         android:icon="@drawable/cloud_24p"
         android:title="@string/title_cloud" />

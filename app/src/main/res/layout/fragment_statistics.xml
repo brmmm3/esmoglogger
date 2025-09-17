@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.gridlayout.widget.GridLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    app:columnCount="2"
+    app:rowCount="3"
+    app:alignmentMode="alignBounds"
+    app:useDefaultMargins="true">
+
+    <TextView
+        android:id="@+id/startTimeTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="Start Time"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/startTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="0.0.0 00:00:00"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/endTimeTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="End Time"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/endTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="0.0.0 00:00:00"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/totalRecordingTimeTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="@string/total_recording_time"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/totalRecordingTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="0s"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/totalDistanceTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="Total Distance"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/totalDistance"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="0km"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/maximumSpeedTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="Maximum Speed"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/maximumSpeed"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="0km/h"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/averageSpeedTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="Average Speed"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/averageSpeed"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="0km/h"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/maximumLevelTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="Maximum Level"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/maximumLevel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="0mW"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/minimumLevelTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="Minimum Level"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/minimumLevel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="0mW"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/averageLevelTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="Average Level"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/averageLevel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="0mW"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/totalEnergyTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="Total Energy"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/totalEnergy"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="0mWh"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/percentRedTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="Percent Red"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/percentRed"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="0%"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/percentYellowTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="Percent Yellow"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/percentYellow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="0%"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/percentGreenTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="Percent Green"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/percentGreen"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="0%"
+        android:textSize="18sp" />
+
+</androidx.gridlayout.widget.GridLayout>
