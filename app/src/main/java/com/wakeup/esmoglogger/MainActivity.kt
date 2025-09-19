@@ -5,19 +5,29 @@ package com.wakeup.esmoglogger
 import android.content.Context
 import android.net.ConnectivityManager
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.NavigationUI.setupActionBarWithNavController
 import androidx.navigation.ui.NavigationUI.setupWithNavController
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.wakeup.esmoglogger.data.Recording
 import com.wakeup.esmoglogger.databinding.ActivityMainBinding
 import com.wakeup.esmoglogger.location.LocationHandler
 import com.wakeup.esmoglogger.serialcommunication.SerialCommunication
 import com.wakeup.esmoglogger.serialcommunication.SharedSerialData
+import com.wakeup.esmoglogger.ui.chartview.ChartViewFragment
+import com.wakeup.esmoglogger.ui.cloud.CloudFragment
+import com.wakeup.esmoglogger.ui.home.HomeFragment
+import com.wakeup.esmoglogger.ui.mapview.MapViewFragment
+import com.wakeup.esmoglogger.ui.settings.SettingsFragment
+import com.wakeup.esmoglogger.ui.statistics.StatisticsFragment
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.osmdroid.config.Configuration
@@ -40,6 +50,9 @@ class MainActivity : AppCompatActivity() {
     private var serial: SerialCommunication? = null
     private lateinit var locationHandler: LocationHandler
     private val viewModel: SharedViewModel by viewModels()
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var adapter: BottomNavAdapter
+    private var selectedPosition = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,20 +71,28 @@ class MainActivity : AppCompatActivity() {
 
         // Passing each menu ID as a set of Ids because each
         // menu should be considered as top level destinations.
-        val appBarConfiguration = AppBarConfiguration.Builder(
-            R.id.navigation_home, R.id.navigation_chart, R.id.navigation_cloud, R.id.navigation_map, R.id.navigation_statistics
-        ).build()
-        val navHostFragment = supportFragmentManager
-            .findFragmentById(R.id.nav_host_fragment_activity_main) as NavHostFragment
-        val navController = navHostFragment.navController
-        setupActionBarWithNavController(this, navController, appBarConfiguration)
-        setupWithNavController(binding!!.navView, navController)
+        recyclerView = findViewById(R.id.custom_bottom_nav)
+        recyclerView.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
 
-        binding!!.navView.menu.findItem(R.id.navigation_map)?.let { menuItem ->
-            menuItem.isEnabled = true
-            menuItem.icon?.clearColorFilter()
-            menuItem.icon?.alpha = 255
+        // Sample data for navigation items
+        val navItems = listOf(
+            NavItem(R.drawable.home_24p, "Home", HomeFragment::class.java),
+            NavItem(R.drawable.chart_24p, "Chart", ChartViewFragment::class.java),
+            NavItem(R.drawable.globe_blue_24p, "Map", MapViewFragment::class.java),
+            NavItem(R.drawable.cloud_24p, "Cloud", CloudFragment::class.java),
+            NavItem(R.drawable.statistics_24p, "Statistics", StatisticsFragment::class.java),
+            NavItem(R.drawable.settings_24p, "Settings", SettingsFragment::class.java)
+        )
+
+        // Initialize adapter
+        adapter = BottomNavAdapter(navItems) { position ->
+            selectItem(position)
         }
+        recyclerView.adapter = adapter
+
+        // Load the initial fragment (Home)
+        selectItem(0)
 
         // Setup USB serial communication
         serial = SerialCommunication(this)
@@ -116,6 +137,19 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         serial?.cleanup()
+    }
+
+    private fun selectItem(position: Int) {
+        // Update selected position and notify adapter
+        selectedPosition = position
+        adapter.setSelectedPosition(position)
+
+        // Switch fragment
+        val fragmentClass = adapter.getItem(position).fragmentClass
+        val fragment = fragmentClass.getDeclaredConstructor().newInstance() as Fragment
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .commit()
     }
 
     fun isOnline(): Boolean {

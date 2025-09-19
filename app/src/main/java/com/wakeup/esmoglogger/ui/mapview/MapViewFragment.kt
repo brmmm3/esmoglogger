@@ -69,6 +69,7 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 import androidx.core.view.isVisible
+import com.wakeup.esmoglogger.calcDistance
 import kotlin.math.max
 
 data class MapViewData(val value: ESmogAndLocation, val new: Boolean)
@@ -286,7 +287,6 @@ class MapViewFragment : Fragment() {
     @SuppressLint("DefaultLocale")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val R = 6371000.0
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.mapViewDataQueue.buffer(10000).collect { data ->
@@ -295,18 +295,14 @@ class MapViewFragment : Fragment() {
                         tapPositionMarker = null
                     }
                     esmogAndLocation.add(ESmogAndLocation(data.value.time, data.value.level, data.value.frequency, data.value.latitude, data.value.longitude, data.value.altitude))
-                    val geoPoint = GeoPoint(data.value.latitude, data.value.longitude)
+                    val geoPoint = GeoPoint(data.value.latitude, data.value.longitude, data.value.altitude)
                     if (lastLocation != null) {
                         val now = LocalDateTime.now()
                         val dt = Duration.between(lastLocationTime, now).toNanos().toFloat() / 1000000f
                         if (now > lastLocationTime) {
                             lastLocationTime = now
                         }
-                        val dLatitde: Double = abs(lastLocation?.latitude?.minus(geoPoint.latitude)!!)
-                        val dLongitude: Double = abs(lastLocation?.longitude?.minus(geoPoint.longitude)!!)
-                        val a = sin(dLatitde / 360.0 * PI).pow(2.0) + cos(lastLocation?.latitude!! / 180.0 * PI) * cos(geoPoint.latitude / 180.0 * PI) * sin(dLongitude / 360.0 * PI).pow(2.0)
-                        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-                        val curDistance = (R * c).toFloat()
+                        val curDistance = calcDistance(geoPoint, lastLocation!!).toFloat()
                         distance += curDistance
                         speed = if (curDistance == 0f || dt == 0f) {
                             0f
@@ -428,7 +424,7 @@ class MapViewFragment : Fragment() {
                     val endTime = values.last().time
                     val dt = endTime - startTime
                     val xZoom = 100f / max(dt, 1.0f)
-                    println("$width ${values.size} $startTime $endTime $dt $xZoom")
+                    //println("$width ${values.size} $startTime $endTime $dt $xZoom")
                     for (value in values) {
                         chartManager?.addChartPt(
                             (value.time - startTime) * xZoom,
@@ -608,7 +604,7 @@ class MapViewFragment : Fragment() {
         val boundingBox = mapView.boundingBox
         val visibleESmog = mutableListOf<ESmogAndLocation>()
         for (value in esmogAndLocation) {
-            if (boundingBox.contains(GeoPoint(value.latitude, value.longitude))) {
+            if (boundingBox.contains(GeoPoint(value.latitude, value.longitude, value.altitude))) {
                 visibleESmog.add(value)
             }
         }

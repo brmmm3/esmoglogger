@@ -26,7 +26,7 @@
     <string name="gps">GPS</string>
     <string name="count">Count</string>
     <string name="loaded">Ld</string>
-    <string name="total_recording_time">Tocal Recording Time</string>
+    <string name="total_recording_time">Total Rec. Time</string>
     <string name="statistics">Statistics</string>
     <string-array name="chart_view_options">
         <item>Lvl</item>

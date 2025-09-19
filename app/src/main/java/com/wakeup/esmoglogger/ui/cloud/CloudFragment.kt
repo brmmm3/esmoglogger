@@ -30,6 +30,6 @@ class CloudFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        view?.findViewById<RecyclerView?>(R.id.nav_view)?.layoutManager = null
+        view?.findViewById<RecyclerView?>(R.id.custom_bottom_nav)?.layoutManager = null
     }
 }

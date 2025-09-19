@@ -66,7 +66,7 @@ class Recording {
         data = CopyOnWriteArrayList(decompressData(compressedHex!!))
         if (endTime == startTime) {
             // Calculate end time from number of data values. Assume 2 values per second
-            endTime.plusSeconds(data.size.toLong() / 2)
+            endTime = endTime.plusSeconds(data.size.toLong() / 2)
         }
         compressedHex = null
         return true

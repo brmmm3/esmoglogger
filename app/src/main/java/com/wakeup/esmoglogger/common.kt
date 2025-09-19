@@ -5,11 +5,24 @@ import android.graphics.PorterDuff
 import android.os.Build
 import androidx.core.graphics.toColorInt
 import com.google.android.material.button.MaterialButton
+import org.osmdroid.util.GeoPoint
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 const val PREFS_KEY: String = "ESmogLogger"
 const val PREFS_DARKMODE: String = "DarkMode"
 
 data class FileInfo(val name: String, val size: Long, val hasGps: Boolean, val count: Int)
+
+val levelLimits = arrayListOf(
+    0.18,
+    5.8
+)
 
 val levelColors = arrayListOf(
     Pair(0.0, Color.GRAY),
@@ -56,4 +69,52 @@ fun isEmulator(): Boolean {
             Build.PRODUCT == "sdk_gphone64_arm64" ||
             Build.HARDWARE.contains("goldfish") ||
             Build.HARDWARE.contains("ranchu"))
+}
+
+fun calcDistance(p1: GeoPoint, p2: GeoPoint): Double {
+    val R = 6371000.0
+    val dLatitde: Double = abs(p1.latitude.minus(p2.latitude))
+    val dLongitude: Double = abs(p1.longitude.minus(p2.longitude))
+    val a = sin(dLatitde / 360.0 * PI).pow(2.0) + cos(p1.latitude / 180.0 * PI) * cos(p2.latitude / 180.0 * PI) * sin(dLongitude / 360.0 * PI).pow(2.0)
+    val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    val d = R * c
+    val dAltitude = p1.altitude - p2.altitude
+    return sqrt(d * d + dAltitude * dAltitude)
+}
+
+class FixedSizeArray<T>(private val size: Int) {
+    private val array = arrayOfNulls<Pair<Float, Double>>(size)
+    private var head = 0 // Points to the next insertion position
+
+    fun push(value: Pair<Float, Double>) {
+        array[head] = value
+        head = (head + 1) % size
+    }
+
+    fun getArray(): List<T> {
+        // Return array in logical order (oldest to newest)
+        return (0 until size).map { array[(head + it) % size] as T }
+    }
+
+    fun getDistanceSum(): Float {
+        var sum = 0.0f // Use Double to handle all numeric types
+        for (i in 0 until size) {
+            val value = array[(head + i) % size]
+            when (value) {
+                is Pair<*, *> -> sum += value.first
+            }
+        }
+        return sum
+    }
+
+    fun getTimeSum(): Double {
+        var sum = 0.0 // Use Double to handle all numeric types
+        for (i in 0 until size) {
+            val value = array[(head + i) % size]
+            when (value) {
+                is Pair<*, *> -> sum += value.second
+            }
+        }
+        return sum
+    }
 }
