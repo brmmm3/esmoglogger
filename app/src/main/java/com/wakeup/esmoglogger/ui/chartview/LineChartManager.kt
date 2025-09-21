@@ -127,6 +127,16 @@ class LineChartManager(lineChart: LineChart, customRenderer: Boolean) {
         chart.resetViewPortOffsets()
         chart.fitScreen() // Reset zoom
         chart.setVisibleXRangeMaximum(100f)
+
+        chart.post {
+            val visibleXRange = lineChart.visibleXRange
+            val lowestX = lineChart.lowestVisibleX
+            val highestX = lineChart.highestVisibleX
+
+            println("Initial Visible X Range: $visibleXRange")
+            println("Initial Lowest Visible X: $lowestX")
+            println("Initial Highest Visible X: $highestX")
+        }
     }
 
     fun showLevelData(show: Boolean) {
@@ -154,12 +164,16 @@ class LineChartManager(lineChart: LineChart, customRenderer: Boolean) {
         return ymax
     }
 
-    fun resetScale() {
-        chart.resetViewPortOffsets()
-        chart.fitScreen() // Reset zoom
-        chart.setVisibleXRangeMaximum(100f)
-        chart.axisLeft.axisMaximum = scaleAxisToLast100(lvlDataSet.values as ArrayList<Entry>)
-        chart.axisRight.axisMaximum = scaleAxisToLast100(frqDataSet.values as ArrayList<Entry>)
+    fun resetScale(xRangeMax: Float) {
+        println("resetScale: $xRangeMax")
+        chart.apply {
+            resetViewPortOffsets()
+            fitScreen() // Reset zoom
+            setVisibleXRangeMaximum(xRangeMax)
+            moveViewToX(0f)
+            axisLeft.axisMaximum = scaleAxisToLast100(lvlDataSet.values as ArrayList<Entry>)
+            axisRight.axisMaximum = scaleAxisToLast100(frqDataSet.values as ArrayList<Entry>)
+        }
     }
 
     fun isEmpty(): Boolean {
@@ -180,6 +194,14 @@ class LineChartManager(lineChart: LineChart, customRenderer: Boolean) {
     fun notifyDataChanged() {
         chart.data.notifyDataChanged()
         chart.notifyDataSetChanged()
+        chart.invalidate()
+    }
+
+    fun xMax(): Float {
+        if (lvlDataSet.values.isEmpty()) {
+            return 0f
+        }
+        return lvlDataSet.values.last()!!.x
     }
 
     fun addChartPt(time: Float, level: Float, frequency: Int, notify: Boolean) {
@@ -199,13 +221,13 @@ class LineChartManager(lineChart: LineChart, customRenderer: Boolean) {
         if (notify) {
             chart.data.notifyDataChanged()
             chart.notifyDataSetChanged()
-        }
-        val width = chart.viewPortHandler.contentWidth()
-        if (time > width) {
-            //entries.removeAt(0)
-            chart.moveViewToX(time - width)
-        } else {
-            chart.invalidate()
+            val width = chart.viewPortHandler.contentWidth()
+            if (time > width) {
+                //entries.removeAt(0)
+                chart.moveViewToX(time - width)
+            } else {
+                chart.invalidate()
+            }
         }
     }
 }

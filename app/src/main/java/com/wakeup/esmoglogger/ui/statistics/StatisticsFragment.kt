@@ -145,22 +145,21 @@ class StatisticsFragment : Fragment() {
         }
 
         val totalCnt = colorCnt.values.sum() / 100f
-
         for (key in rfPowerLimits.values) {
             colorCnt[key] = colorCnt.getOrDefault(key, 0f) / totalCnt
         }
 
-        setPercentTextBar(root, R.id.percentGreen1, R.id.percentGreen1Bar, colorCnt.getOrDefault("GREEN1", 0f), "#007F00".toColorInt())
-        setPercentTextBar(root, R.id.percentGreen2, R.id.percentGreen2Bar, colorCnt.getOrDefault("GREEN2", 0f), "#00BF00".toColorInt())
-        setPercentTextBar(root, R.id.percentGreen3, R.id.percentGreen3Bar, colorCnt.getOrDefault("GREEN3", 0f), Color.GREEN)
-
-        setPercentTextBar(root, R.id.percentYellow1, R.id.percentYellow1Bar, colorCnt.getOrDefault("YELLOW1", 0f), "#7F7F00".toColorInt())
-        setPercentTextBar(root, R.id.percentYellow2, R.id.percentYellow2Bar, colorCnt.getOrDefault("YELLOW2", 0f), "#BFBF00".toColorInt())
-        setPercentTextBar(root, R.id.percentYellow3, R.id.percentYellow3Bar, colorCnt.getOrDefault("YELLOW3", 0f), Color.YELLOW)
-
-        setPercentTextBar(root, R.id.percentRed1, R.id.percentRed1Bar, colorCnt.getOrDefault("RED1", 0f), "#7F0000".toColorInt())
-        setPercentTextBar(root, R.id.percentRed2, R.id.percentRed2Bar, colorCnt.getOrDefault("RED2", 0f), "#BF0000".toColorInt())
         setPercentTextBar(root, R.id.percentRed3, R.id.percentRed3Bar, colorCnt.getOrDefault("RED3", 0f), Color.RED)
+        setPercentTextBar(root, R.id.percentRed2, R.id.percentRed2Bar, colorCnt.getOrDefault("RED2", 0f), "#BF0000".toColorInt())
+        setPercentTextBar(root, R.id.percentRed1, R.id.percentRed1Bar, colorCnt.getOrDefault("RED1", 0f), "#7F0000".toColorInt())
+
+        setPercentTextBar(root, R.id.percentYellow3, R.id.percentYellow3Bar, colorCnt.getOrDefault("YELLOW3", 0f), Color.YELLOW)
+        setPercentTextBar(root, R.id.percentYellow2, R.id.percentYellow2Bar, colorCnt.getOrDefault("YELLOW2", 0f), "#BFBF00".toColorInt())
+        setPercentTextBar(root, R.id.percentYellow1, R.id.percentYellow1Bar, colorCnt.getOrDefault("YELLOW1", 0f), "#7F7F00".toColorInt())
+
+        setPercentTextBar(root, R.id.percentGreen3, R.id.percentGreen3Bar, colorCnt.getOrDefault("GREEN3", 0f), Color.GREEN)
+        setPercentTextBar(root, R.id.percentGreen2, R.id.percentGreen2Bar, colorCnt.getOrDefault("GREEN2", 0f), "#00BF00".toColorInt())
+        setPercentTextBar(root, R.id.percentGreen1, R.id.percentGreen1Bar, colorCnt.getOrDefault("GREEN1", 0f), "#007F00".toColorInt())
 
         return root
     }

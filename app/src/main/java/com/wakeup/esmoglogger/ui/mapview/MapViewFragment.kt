@@ -418,7 +418,6 @@ class MapViewFragment : Fragment() {
                     val endTime = values.last().time
                     val dt = (endTime - startTime).toFloat() / 1000f
                     val xZoom = 100f / max(dt, 1.0f)
-                    //println("$width ${values.size} $startTime $endTime $dt $xZoom")
                     for (value in values) {
                         chartManager?.addChartPt(
                             (value.time - startTime) * xZoom,
@@ -429,7 +428,7 @@ class MapViewFragment : Fragment() {
                     }
                 }
                 chartManager?.notifyDataChanged()
-                chartManager?.resetScale()
+                chartManager?.resetScale(chartManager?.xMax()!!)
                 delayedChartInvalidate = null
             }
         }

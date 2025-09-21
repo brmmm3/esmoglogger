@@ -60,7 +60,7 @@ class ChartViewFragment : Fragment() {
         val resetScaleButton = view.findViewById<Button>(R.id.button_reset_scale)
 
         resetScaleButton?.setOnClickListener { v: View? ->
-            chartManager?.resetScale()
+            chartManager?.resetScale(100f)
         }
 
         val chartViewSpinner: Spinner = view.findViewById(R.id.chart_view_spinner)
