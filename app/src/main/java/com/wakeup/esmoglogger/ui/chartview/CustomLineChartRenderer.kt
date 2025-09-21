@@ -3,12 +3,11 @@ package com.wakeup.esmoglogger.ui.chartview
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import androidx.core.graphics.alpha
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.renderer.LineChartRenderer
 import com.github.mikephil.charting.utils.Transformer
 import com.github.mikephil.charting.utils.ViewPortHandler
-import com.wakeup.esmoglogger.levelColors
+import com.wakeup.esmoglogger.rfPowerColors
 
 class CustomLineChartRenderer(
     chart: LineChart,
@@ -40,8 +39,8 @@ class CustomLineChartRenderer(
 
         val transformer: Transformer = mChart.getTransformer(com.github.mikephil.charting.components.YAxis.AxisDependency.LEFT)
         val viewPort = mViewPortHandler.contentRect
-        var oldLevelColor = levelColors.firstOrNull()
-        for (levelColor in levelColors.drop(1)) {
+        var oldLevelColor = rfPowerColors.firstOrNull()
+        for (levelColor in rfPowerColors.drop(1)) {
             val oldArea = transformer.getPixelForValues(0f, oldLevelColor!!.first.toFloat()).y.toFloat()
             val area = transformer.getPixelForValues(0f, levelColor.first.toFloat()).y.toFloat()
             val paint = Paint().apply {

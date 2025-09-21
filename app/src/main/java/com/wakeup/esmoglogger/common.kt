@@ -19,29 +19,50 @@ const val PREFS_DARKMODE: String = "DarkMode"
 
 data class FileInfo(val name: String, val size: Long, val hasGps: Boolean, val count: Int)
 
-val levelLimits = arrayListOf(
-    0.18,
-    5.8
+// mW/m2
+val rfPowerLimits = hashMapOf(
+    0.0 to "GREEN1",
+    0.06 to "GREEN2", // Some signal source around
+    0.18 to "GREEN3", // WiFi Wireless LAN typ. in this range
+    0.58 to "YELLOW1",
+    1.8 to "YELLOW2",
+    5.8 to "YELLOW3",
+    18.0 to "RED1",   // Russian RF safety standard
+    58.0 to "RED2",   // Swiss RF safety standard
+    180.0 to "RED3"   // Italy RF safety standard
 )
 
-val levelColors = arrayListOf(
+// V/m
+val eFieldLimits = hashMapOf(
+    0.0 to "GREEN1",
+    10.0 to "GREEN2",
+    20.0 to "GREEN3",
+    30.0 to "YELLOW1",
+    50.0 to "YELLOW2",
+    75.0 to "YELLOW3",
+    100.0 to "RED1",
+    200.0 to "RED2",
+    500.0 to "RED3"
+)
+
+val rfPowerColors = arrayListOf(
     Pair(0.0, Color.GRAY),
     Pair(0.06, "#007F00".toColorInt()),
     Pair(0.18, Color.GREEN),
     Pair(0.28, "#7FFF00".toColorInt()),
-    Pair(1.0, "#AFFF00".toColorInt()),
-    Pair(2.0, "#BFFF00".toColorInt()),
+    Pair(0.58, "#AFFF00".toColorInt()),
+    Pair(1.5, "#BFFF00".toColorInt()),
     Pair(3.0, "#CFFF00".toColorInt()),
     Pair(4.0, "#DFFF00".toColorInt()),
     Pair(5.8, Color.YELLOW),
-    Pair(8.0, "#FF7F00".toColorInt()),
-    Pair(9.0, "#FF5F00".toColorInt()),
-    Pair(10.0, "#FF3F00".toColorInt()),
-    Pair(15.0, Color.RED),
+    Pair(10.0, "#FF7F00".toColorInt()),
+    Pair(14.0, "#FF5F00".toColorInt()),
+    Pair(18.0, "#FF3F00".toColorInt()),
+    Pair(58.0, "#FF1F00".toColorInt()),
     Pair(180.0, Color.RED))
 
 fun getLevelColor(level: Float): Int {
-    for (levelColor in levelColors) {
+    for (levelColor in rfPowerColors) {
         if (level <= levelColor.first) {
             return levelColor.second
         }

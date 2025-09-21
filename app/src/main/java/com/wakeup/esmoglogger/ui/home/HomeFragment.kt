@@ -76,7 +76,7 @@ class HomeFragment : Fragment() {
 
     private val updateTimeRunnable = object : Runnable {
         override fun run() {
-            val dt = Duration.between(viewModel.startTime, LocalDateTime.now())
+            val dt = Duration.between(viewModel.recording.startTime, LocalDateTime.now())
             view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "${dt.toMillis() / 1000} s"
             handler.postDelayed(this, 1000)
         }
@@ -130,7 +130,7 @@ class HomeFragment : Fragment() {
         buttonSetEnabled(buttonSave, false)
 
         if (viewModel.isRecording.value == true) {
-            val dt = Duration.between(viewModel.startTime, LocalDateTime.now())
+            val dt = Duration.between(viewModel.recording.startTime, LocalDateTime.now())
             view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "${dt.toMillis() / 1000} s"
             buttonRecord.setIconResource(R.drawable.stop_32p)
         } else {
@@ -163,7 +163,6 @@ class HomeFragment : Fragment() {
                 SharedSerialData.start()
                 buttonRecord.setIconResource(R.drawable.stop_32p)
                 gpsEnabled.isEnabled = false
-                viewModel.startTime = LocalDateTime.now()
                 viewModel.startRecording()
                 view?.findViewById<TextView>(R.id.textview_recorded_time)?.text = "0 s"
                 handler.post(updateTimeRunnable)

@@ -38,7 +38,7 @@ class BottomNavAdapter(
         // Highlight selected item
         if (position == selectedPosition) {
             holder.icon.setColorFilter(
-                ContextCompat.getColor(holder.itemView.context, android.R.color.holo_blue_dark)
+                ContextCompat.getColor(holder.itemView.context, android.R.color.holo_green_light)
             )
             holder.title.setTextColor(
                 ContextCompat.getColor(holder.itemView.context, android.R.color.holo_blue_dark)

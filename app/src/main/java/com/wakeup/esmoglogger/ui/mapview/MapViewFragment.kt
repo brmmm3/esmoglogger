@@ -62,12 +62,6 @@ import kotlin.math.abs
 import androidx.core.graphics.withSave
 import java.time.Duration
 import java.time.LocalDateTime
-import kotlin.math.PI
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.pow
-import kotlin.math.sin
-import kotlin.math.sqrt
 import androidx.core.view.isVisible
 import com.wakeup.esmoglogger.calcDistance
 import kotlin.math.max
@@ -90,7 +84,7 @@ class MapViewFragment : Fragment() {
     private var lastLevel = 0f
     private var lastCenter: GeoPoint? = null
     private var lastOrientation: Float = 0f
-    private var lastLocationTime: LocalDateTime = LocalDateTime.now()
+    private var lastTime: Long = 0
     private var lastLocation: GeoPoint? = null
     private var distance = 0f // m
     private var speed = 0f // m/s
@@ -276,7 +270,7 @@ class MapViewFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.esmogQueue.collect { value ->
-                    chartManager?.addChartPt(value.time, value.level, value.frequency, true)
+                    chartManager?.addChartPt(value.time.toFloat() / 1000f, value.level, value.frequency, true)
                 }
             }
         }
@@ -297,11 +291,11 @@ class MapViewFragment : Fragment() {
                     esmogAndLocation.add(ESmogAndLocation(data.value.time, data.value.level, data.value.frequency, data.value.latitude, data.value.longitude, data.value.altitude))
                     val geoPoint = GeoPoint(data.value.latitude, data.value.longitude, data.value.altitude)
                     if (lastLocation != null) {
-                        val now = LocalDateTime.now()
-                        val dt = Duration.between(lastLocationTime, now).toNanos().toFloat() / 1000000f
-                        if (now > lastLocationTime) {
-                            lastLocationTime = now
+                        if (lastTime == 0L || lastTime > data.value.time) {
+                            lastTime = data.value.time
                         }
+                        val dt = (data.value.time - lastTime).toFloat() / 1000f
+                        lastTime = data.value.time
                         val curDistance = calcDistance(geoPoint, lastLocation!!).toFloat()
                         distance += curDistance
                         speed = if (curDistance == 0f || dt == 0f) {
@@ -422,7 +416,7 @@ class MapViewFragment : Fragment() {
                 if (!values.isEmpty()) {
                     val startTime = values.first().time
                     val endTime = values.last().time
-                    val dt = endTime - startTime
+                    val dt = (endTime - startTime).toFloat() / 1000f
                     val xZoom = 100f / max(dt, 1.0f)
                     //println("$width ${values.size} $startTime $endTime $dt $xZoom")
                     for (value in values) {
@@ -544,7 +538,7 @@ class MapViewFragment : Fragment() {
         levelPaint.setShadowLayer(4f, 2f, 2f, Color.BLACK)
 
         val xMargin = 20f
-        val yMargin = 200f
+        val yMargin = 20f
 
         val overlay = object : Overlay() {
             @SuppressLint("DefaultLocale")
@@ -562,11 +556,21 @@ class MapViewFragment : Fragment() {
                     } else {
                         levelPaint.color = getLevelColor(lastLevel)
                     }
-                    drawText(String.format("%6.2f mW", lastLevel), x, y, levelPaint)
-                    drawText(String.format("%6.2f km/h", speed), xMargin, y, speedPaint)
-                    drawText(String.format("%6.2f m", distance), xMargin, y - 100, speedPaint)
-                    val dt = Duration.between(viewModel.startTime, LocalDateTime.now())
-                    drawText("${dt.toMillis() / 1000} s", x, y - 100, paint)
+                    drawText(String.format("%6.2f mW", lastLevel), x, y - 100, levelPaint)
+                    drawText(String.format("%d km/h", speed.toInt()), xMargin, y, speedPaint)
+                    if (distance > 1000f) {
+                        drawText(String.format("%6.2f km", distance / 1000f), xMargin, y - 100, speedPaint)
+                    } else {
+                        drawText(String.format("%d m", distance.toInt()), xMargin, y - 100, speedPaint)
+                    }
+                    var seconds = (lastTime - viewModel.recording.startTimeMillis) / 1000
+                    if (seconds > 59) {
+                        val minutes = seconds / 60
+                        seconds -= 60 * minutes
+                        drawText("$minutes min  $seconds s", x, y, paint)
+                    } else {
+                        drawText("$seconds s", x, y, paint)
+                    }
                 }
             }
         }

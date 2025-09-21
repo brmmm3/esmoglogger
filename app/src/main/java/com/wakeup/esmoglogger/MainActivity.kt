@@ -3,7 +3,9 @@
 package com.wakeup.esmoglogger
 
 import android.content.Context
+import android.content.Intent
 import android.net.ConnectivityManager
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.viewModels
@@ -104,8 +106,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
         this.lifecycleScope.launch {
-            SharedSerialData.esmog.collect { lvlFrq ->
-                viewModel.addESmog(lvlFrq.first, lvlFrq.second)
+            SharedSerialData.esmog.collect { esmog ->
+                viewModel.addESmog(esmog)
             }
         }
 
@@ -131,6 +133,13 @@ class MainActivity : AppCompatActivity() {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         } else {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+        }
+
+        val serviceIntent = Intent(this, ApiForegroundService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
         }
     }
 

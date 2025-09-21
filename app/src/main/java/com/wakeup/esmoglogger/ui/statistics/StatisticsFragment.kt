@@ -1,11 +1,13 @@
 package com.wakeup.esmoglogger.ui.statistics
 
 import android.annotation.SuppressLint
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.graphics.toColorInt
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import com.wakeup.esmoglogger.FixedSizeArray
@@ -13,7 +15,7 @@ import com.wakeup.esmoglogger.R
 import com.wakeup.esmoglogger.SharedViewModel
 import com.wakeup.esmoglogger.calcDistance
 import com.wakeup.esmoglogger.databinding.FragmentStatisticsBinding
-import com.wakeup.esmoglogger.levelLimits
+import com.wakeup.esmoglogger.rfPowerLimits
 import org.osmdroid.util.GeoPoint
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -42,9 +44,9 @@ class StatisticsFragment : Fragment() {
         var minimumLevelValue = 0f
         var minimumLevelValueInit = false
         var totalEnergyValue = 0f
-        var greenCnt = 0
-        var yellowCnt = 0
-        var redCnt = 0
+        val colorCnt: HashMap<String, Float> = hashMapOf()
+        val rfPowerLimitKeys = rfPowerLimits.keys.sorted().reversed()
+        val rfPowerLimitMin = rfPowerLimitKeys.min()
         for (recording in viewModel.recordings) {
             if (recording.startTime < startTimeValue) {
                 startTimeValue = recording.startTime
@@ -57,36 +59,40 @@ class StatisticsFragment : Fragment() {
             if (!recording.data.isEmpty()) {
                 val value = recording.data.first()
                 var lastLocation = GeoPoint(value.latitude, value.longitude, value.altitude)
-                var distanceArray = FixedSizeArray<Pair<Float, Double>>(3)
-                var dt = 0.0
+                val distanceArray = FixedSizeArray<Pair<Float, Double>>(3)
+                var lastTime = 0L
                 for (value in recording.data) {
                     val location = GeoPoint(value.latitude, value.longitude, value.altitude)
-                    dt += 0.5
                     if (location != lastLocation) {
                         val distance = calcDistance(location, lastLocation).toFloat()
                         totalDistanceValue += distance
+                        val dt = (value.time - lastTime).toDouble() / 1000.0
                         distanceArray.push(Pair(distance, dt))
                         val speed = distanceArray.getDistanceSum().toDouble() / distanceArray.getTimeSum()
                         if (speed > maximumSpeedValue) {
                             maximumSpeedValue = speed
                         }
-                        dt = 0.0
                     }
                     lastLocation = location
-                    if (value.level > maximumLevelValue) {
-                        maximumLevelValue = value.level
+                    lastTime = value.time
+                    val level = value.level
+                    if (level > maximumLevelValue) {
+                        maximumLevelValue = level
                     }
-                    if (!minimumLevelValueInit || (value.level < minimumLevelValue)) {
-                        minimumLevelValue = value.level
+                    if (!minimumLevelValueInit || (level < minimumLevelValue)) {
+                        minimumLevelValue = level
                         minimumLevelValueInit = true
                     }
-                    totalEnergyValue += value.level * 0.5f
-                    if (value.level > levelLimits[1]) {
-                        redCnt += 1
-                    } else if (value.level > levelLimits[0]) {
-                        yellowCnt += 1
-                    } else {
-                        greenCnt += 1
+                    totalEnergyValue += level * 0.5f
+                    for (limit in rfPowerLimitKeys) {
+                        if (level > limit) {
+                            val key = rfPowerLimits[limit]
+                            colorCnt[key!!] = colorCnt.getOrDefault(key, 0f) + 1f
+                            break
+                        }
+                    }
+                    if (level <= rfPowerLimitMin) {
+                        colorCnt["GREEN1"] = colorCnt.getOrDefault("GREEN1", 0f) + 1f
                     }
                 }
             }
@@ -108,50 +114,62 @@ class StatisticsFragment : Fragment() {
 
         val totalDistance = root.findViewById<TextView>(R.id.totalDistance)
         if (totalDistanceValue > 1000.0) {
-            totalDistance.text = "${"%.2f".format(totalDistanceValue / 1000.0)} km"
+            totalDistance.text = "%.2f km".format(totalDistanceValue / 1000.0)
         } else {
             totalDistance.text = "${totalDistanceValue.toInt()} m"
         }
 
         // Workarounds
         val averageSpeedValue = totalDistanceValue / totalRecordingTimeValue
-        if (maximumSpeedValue > 2.0 * averageSpeedValue) {
-            maximumSpeedValue = 2.0 * averageSpeedValue
-        }
 
         val maximumSpeed = root.findViewById<TextView>(R.id.maximumSpeed)
-        maximumSpeed.text = "${"%.2f".format(maximumSpeedValue * 3.6)} km/h"
+        maximumSpeed.text = "%.2f km/h".format(maximumSpeedValue * 3.6)
 
         val averageSpeed = root.findViewById<TextView>(R.id.averageSpeed)
-        averageSpeed.text = "${"%.2f".format(averageSpeedValue * 3.6)} km/h"
+        averageSpeed.text = "%.2f km/h".format(averageSpeedValue * 3.6)
 
         val maximumLevel = root.findViewById<TextView>(R.id.maximumLevel)
-        maximumLevel.text = "${"%.2f".format(maximumLevelValue)} mW"
+        maximumLevel.text = "%.2f mW".format(maximumLevelValue)
 
         val minimumLevel = root.findViewById<TextView>(R.id.minimumLevel)
-        minimumLevel.text = "${"%.2f".format(minimumLevelValue)} mW"
+        minimumLevel.text = "%.2f mW".format(minimumLevelValue)
 
         val averageLevel = root.findViewById<TextView>(R.id.averageLevel)
-        averageLevel.text = "${"%.2f".format(totalEnergyValue / totalRecordingTimeValue)} mW"
+        averageLevel.text = "%.2f mW".format(totalEnergyValue / totalRecordingTimeValue)
 
         val totalEnergy = root.findViewById<TextView>(R.id.totalEnergy)
         if (totalEnergyValue > 0.0) {
-            totalEnergy.text = "${"%.2f".format(totalEnergyValue / 3600.0f)} mWh"
+            totalEnergy.text = "%.2f mWh".format(totalEnergyValue / 3600.0f)
         } else {
-            totalEnergy.text = "${"%.2f".format(totalEnergyValue)} mWs"
+            totalEnergy.text = "%.2f mWs".format(totalEnergyValue)
         }
 
-        val totalCnt = (greenCnt + yellowCnt + redCnt).toFloat()
+        val totalCnt = colorCnt.values.sum() / 100f
 
-        val percentGreen = root.findViewById<TextView>(R.id.percentGreen)
-        percentGreen.text = "${"%.2f".format(100.0 * greenCnt.toFloat() / totalCnt)} %"
+        for (key in rfPowerLimits.values) {
+            colorCnt[key] = colorCnt.getOrDefault(key, 0f) / totalCnt
+        }
 
-        val percentYellow = root.findViewById<TextView>(R.id.percentYellow)
-        percentYellow.text = "${"%.2f".format(100.0 * yellowCnt.toFloat() / totalCnt)} %"
+        setPercentTextBar(root, R.id.percentGreen1, R.id.percentGreen1Bar, colorCnt.getOrDefault("GREEN1", 0f), "#007F00".toColorInt())
+        setPercentTextBar(root, R.id.percentGreen2, R.id.percentGreen2Bar, colorCnt.getOrDefault("GREEN2", 0f), "#00BF00".toColorInt())
+        setPercentTextBar(root, R.id.percentGreen3, R.id.percentGreen3Bar, colorCnt.getOrDefault("GREEN3", 0f), Color.GREEN)
 
-        val percentRed = root.findViewById<TextView>(R.id.percentRed)
-        percentRed.text = "${"%.2f".format(100.0 * redCnt.toFloat() / totalCnt)} %"
+        setPercentTextBar(root, R.id.percentYellow1, R.id.percentYellow1Bar, colorCnt.getOrDefault("YELLOW1", 0f), "#7F7F00".toColorInt())
+        setPercentTextBar(root, R.id.percentYellow2, R.id.percentYellow2Bar, colorCnt.getOrDefault("YELLOW2", 0f), "#BFBF00".toColorInt())
+        setPercentTextBar(root, R.id.percentYellow3, R.id.percentYellow3Bar, colorCnt.getOrDefault("YELLOW3", 0f), Color.YELLOW)
+
+        setPercentTextBar(root, R.id.percentRed1, R.id.percentRed1Bar, colorCnt.getOrDefault("RED1", 0f), "#7F0000".toColorInt())
+        setPercentTextBar(root, R.id.percentRed2, R.id.percentRed2Bar, colorCnt.getOrDefault("RED2", 0f), "#BF0000".toColorInt())
+        setPercentTextBar(root, R.id.percentRed3, R.id.percentRed3Bar, colorCnt.getOrDefault("RED3", 0f), Color.RED)
 
         return root
+    }
+
+    fun setPercentTextBar(root: View, textViewId: Int, barId: Int, value: Float, color: Int) {
+        val text = root.findViewById<TextView>(textViewId)
+        text.text = getString(R.string._1f).format(value)
+        text.setTextColor(color)
+        val bar = root.findViewById<View>(barId)
+        bar.layoutParams.width = (value * 3.0).toInt()
     }
 }

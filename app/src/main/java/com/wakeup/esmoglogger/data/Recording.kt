@@ -4,20 +4,21 @@ import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.Float
 
-data class ESmog(val time: Float,
+data class ESmog(var time: Long,
                  val level: Float,
                  val frequency: Int)
 
-data class GpsLocation(val time: Float,
+data class GpsLocation(var time: Long,
                        val latitude: Double,
                        val longitude: Double,
                        val altitude: Double)
 
-data class ESmogAndLocation(val time: Float,
+data class ESmogAndLocation(var time: Long,
                             var level: Float,
                             val frequency: Int,
                             var latitude: Double,
@@ -26,13 +27,19 @@ data class ESmogAndLocation(val time: Float,
 
 class Recording {
     var startTime: LocalDateTime = LocalDateTime.now()
+    var startTimeMillis: Long = 0
     var endTime: LocalDateTime = LocalDateTime.now()
+    var endTimeMillis: Long = 0
     // Data series name
     var name = ""
+    // Data Format version
+    var version: Int = 1
     // App version
-    var version: Int = 0
+    var appId = "com.wakeup.esmoglogger"  // Should be: BuildConfig.APPLICATION_ID
+    // App version
+    var appVersion = "0.1.0"  // Should be: BuildConfig.VERSION_NAME
     // Device name
-    var device = ""
+    var device = "ED88TPlus5G2"
     var hasGps = false
     var data: CopyOnWriteArrayList<ESmogAndLocation> = CopyOnWriteArrayList()
     var compressedHex: String? = null
@@ -63,7 +70,7 @@ class Recording {
         if (compressedHex == null) {
             return false
         }
-        data = CopyOnWriteArrayList(decompressData(compressedHex!!))
+        data = CopyOnWriteArrayList(decompressData(version, compressedHex!!))
         if (endTime == startTime) {
             // Calculate end time from number of data values. Assume 2 values per second
             endTime = endTime.plusSeconds(data.size.toLong() / 2)
@@ -84,6 +91,7 @@ class Recording {
     fun start() {
         data = CopyOnWriteArrayList()
         startTime = LocalDateTime.now()
+        startTimeMillis = startTime.toInstant(ZoneOffset.UTC).toEpochMilli()
         hasGps = false
     }
 
@@ -97,6 +105,7 @@ class Recording {
     fun stop(name: String) {
         this.name = name
         endTime = LocalDateTime.now()
+        endTimeMillis = endTime.toInstant(ZoneOffset.UTC).toEpochMilli()
     }
 
     fun setNotes(notes: String) {
@@ -107,6 +116,8 @@ class Recording {
         val jsonObject = JSONObject()
         jsonObject.put("name", name)
         jsonObject.put("version", version)
+        jsonObject.put("appId", appId)
+        jsonObject.put("appVersion", appVersion)
         jsonObject.put("device", device)
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         jsonObject.put("start", startTime.format(formatter))
@@ -132,6 +143,8 @@ class Recording {
             recording.setSaved(fileName, fileSize)
             recording.name = jsonObject.optString("name")
             recording.version = jsonObject.getInt("version")
+            recording.appId = jsonObject.optString("appId")
+            recording.appVersion = jsonObject.optString("appVersion")
             recording.device = jsonObject.optString("device")
             val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
             recording.startTime = LocalDateTime.parse(jsonObject.get("start") as CharSequence?, formatter)
@@ -148,13 +161,20 @@ class Recording {
             return recording
         }
 
-        fun decompressData(compressedHex: String): ArrayList<ESmogAndLocation> {
+        fun decompressData(version: Int, compressedHex: String): ArrayList<ESmogAndLocation> {
             val jsonArray = JsonCompressor.decompressJson(compressedHex) ?: JSONArray()
             val data: ArrayList<ESmogAndLocation> = ArrayList()
+            var curTime = 0L
             for (i in 0 until jsonArray.length()) {
                 val jsonObject = jsonArray.getJSONArray(i) ?: continue
+                val dt = if (version == 0) {
+                    (jsonObject.getDouble(0) * 1000.0).toLong()
+                } else {
+                    jsonObject.getLong(0)
+                }
+                curTime += dt
                 data.add(ESmogAndLocation(
-                    jsonObject.getDouble(0).toFloat(),
+                    curTime,
                     jsonObject.getDouble(1).toFloat(),
                     jsonObject.getInt(2),
                     jsonObject.getDouble(3),
@@ -169,9 +189,12 @@ class Recording {
     fun compressData() {
         count = data.size
         val jsonData = JSONArray().apply {
+            var lastTime = 0L
             data.forEach { value ->
+                val dt = value.time - lastTime
+                lastTime = value.time
                 put(JSONArray().apply {
-                    put(value.time)
+                    put(dt)
                     put(value.level)
                     put(value.frequency)
                     put(value.latitude)

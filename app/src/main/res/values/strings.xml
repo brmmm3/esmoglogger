@@ -28,6 +28,30 @@
     <string name="loaded">Ld</string>
     <string name="total_recording_time">Total Rec. Time</string>
     <string name="statistics">Statistics</string>
+    <string name="_0">0 %</string>
+    <string name="red_180"><![CDATA[Red (<=180.0)]]></string>
+    <string name="red_58"><![CDATA[Red (<=58.0)]]></string>
+    <string name="yellow_18"><![CDATA[Yellow (<=18.0)]]></string>
+    <string name="yellow_5_8"><![CDATA[Yellow (<=5.8)]]></string>
+    <string name="yellow_1_8"><![CDATA[Yellow (<=1.8)]]></string>
+    <string name="green_0_58"><![CDATA[Green (<=0.58)]]></string>
+    <string name="green_0_18"><![CDATA[Green (<=0.18)]]></string>
+    <string name="green_0_06"><![CDATA[Green (<=0.06)]]></string>
+    <string name="red_gt_180"><![CDATA[Red (>180.0)]]></string>
+    <string name="_1f">%.1f %%</string>
+    <string name="_0_mwh">0 mWh</string>
+    <string name="total_energy">Total Energy</string>
+    <string name="_0_mw">0 mW</string>
+    <string name="average_level">Average Level</string>
+    <string name="minimum_level">Minimum Level</string>
+    <string name="maximum_level">Maximum Level</string>
+    <string name="average_speed">Average Speed</string>
+    <string name="maximum_speed">Maximum Speed</string>
+    <string name="total_distance">Total Distance</string>
+    <string name="_0_0_0_00_00_00">0.0.0 00:00:00</string>
+    <string name="end_time">End Time</string>
+    <string name="start_time">Start Time</string>
+    <string name="_0_km_h">0 km/h</string>
     <string-array name="chart_view_options">
         <item>Lvl</item>
         <item>Frq</item>

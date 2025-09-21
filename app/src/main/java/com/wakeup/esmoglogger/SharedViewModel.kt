@@ -5,6 +5,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Log
 import com.wakeup.esmoglogger.data.Recording
 import com.wakeup.esmoglogger.data.ESmog
 import com.wakeup.esmoglogger.data.ESmogAndLocation
@@ -14,8 +15,8 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
-import java.time.Duration
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 import kotlin.math.max
 
 class SharedViewModel: ViewModel() {
@@ -55,7 +56,6 @@ class SharedViewModel: ViewModel() {
     // DataSeries
     val recordings: MutableList<Recording> = mutableListOf()
     var recording = Recording()
-    var startTime: LocalDateTime = LocalDateTime.now()
 
     fun startGps() {
         _gps.value = true
@@ -94,16 +94,15 @@ class SharedViewModel: ViewModel() {
         }
     }
 
-    fun addESmog(level: Float, frequency: Int) {
-        val dt = Duration.between(recording.startTime, LocalDateTime.now()).toMillis().toFloat() / 1000f
-        val gpsLocation: GpsLocation = location.value ?: GpsLocation(0f, 0.0, 0.0, 0.0)
-        val value = ESmog(dt, level, frequency)
-        _esmog.postValue(value)
+    fun addESmog(esmog: ESmog) {
+        esmog.time -= recording.startTimeMillis
+        val gpsLocation: GpsLocation = location.value ?: GpsLocation(0, 0.0, 0.0, 0.0)
+        _esmog.postValue(esmog)
         viewModelScope.launch {
-            _esmogQueue.emit(value)
+            _esmogQueue.emit(esmog)
         }
         if (isRecording.value == true) {
-            recording.add(ESmogAndLocation(dt, level, frequency, gpsLocation.latitude, gpsLocation.longitude, gpsLocation.altitude))
+            recording.add(ESmogAndLocation(esmog.time, esmog.level, esmog.frequency, gpsLocation.latitude, gpsLocation.longitude, gpsLocation.altitude))
         }
     }
 
@@ -112,7 +111,7 @@ class SharedViewModel: ViewModel() {
     }
 
     fun addLocation(location: Location) {
-        val dt = Duration.between(recording.startTime, LocalDateTime.now()).toMillis().toFloat() / 1000f
+        val dt = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli() - recording.startTimeMillis
         _location.postValue(GpsLocation(dt, location.latitude, location.longitude, location.altitude))
         viewModelScope.launch {
             var cnt = recording.data.size - lastESmogPos
@@ -155,9 +154,9 @@ class SharedViewModel: ViewModel() {
                 }
             } else {
                 val esmog: ESmog = if (isRecording.value == true) {
-                    esmog.value ?: ESmog(0f, 0f, 0)
+                    esmog.value ?: ESmog(0, 0f, 0)
                 } else {
-                    ESmog(0f, 0f, 0)
+                    ESmog(0, 0f, 0)
                 }
                 val value = ESmogAndLocation(dt, esmog.level, esmog.frequency, location.latitude, location.longitude, location.altitude)
                 _mapViewDataQueue.emit(MapViewData(value, false))
